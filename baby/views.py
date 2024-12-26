@@ -60,6 +60,7 @@ class FeedMilkView(APIView):
             response = {"code": 200, "data": result_data, "msg": "fetch all success"}
             return Response(response)
         except Exception as exc:
+            print(exc)
 
             logger.error(str(exc))
             return Response({"code": 205, "data": None, "msg": str(exc)})
