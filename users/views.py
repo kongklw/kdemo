@@ -9,6 +9,10 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import AccessToken
+from django.contrib import auth
+from .models import User
+from rest_framework.generics import CreateAPIView
+from .serializers import CreateUserSerializer
 
 
 def get_tokens_for_user(user):
@@ -23,6 +27,34 @@ def get_tokens_for_user(user):
 # class TokenError(Exception):
 #     pass
 
+class UserView(APIView):
+    # serializer_class = CreateUserSerializer
+    def post(self, request, *args, **kwargs):
+        data = request.data
+        try:
+            print('----------', data)
+            username = data.get('username')
+            password = data.get('password')
+            email = data.get('email')
+            phone = data.get('phone')
+
+            user = User.objects.create_user(username=username, email=email, password=password, phone=phone)
+            user.save()
+
+            return Response({'code': 200, 'msg': 'ok', 'data': None})
+        except Exception as exc:
+            return Response({'code': 205, 'msg': str(exc), 'data': None})
+
+        # serializer = CreateUserSerializer(data=data)
+        # if serializer.is_valid():
+        #     print('验证通过')
+        #     serializer.save()
+        # else:
+        #     print('验证失败')
+        #     print(str(serializer.errors))
+        #     return Response({'code': 205, 'msg': 'failed', 'data': None})
+        # return Response({'code': 200, 'msg': 'ok', 'data': None})
+
 
 class LoginView(APIView):
     def post(self, request, *args, **kwargs):
@@ -31,6 +63,8 @@ class LoginView(APIView):
             username = data.get("username")
             password = data.get("password")
             user = authenticate(username=username, password=password)
+            print(user)
+
             if user is not None:
                 # A backend authenticated the credentials
                 token_data = get_tokens_for_user(user=user)
@@ -41,7 +75,7 @@ class LoginView(APIView):
             else:
                 # No backend authenticated the credentials
 
-                response = {"code": 205, "data": None, "msg": "error"}
+                response = {"code": 205, "data": None, "msg": 'none this user'}
             return Response(response)
         except Exception as exc:
             response = {"code": 205, "data": None, "msg": str(exc)}
@@ -84,6 +118,8 @@ class Logout(APIView):
 
     def post(self, request, *args, **kwargs):
         try:
+            res = auth.logout(request)
+            print('调用logout  ', res)
             return Response({"code": 200, "data": "ok", "msg": "ok"})
         except Exception as exc:
 

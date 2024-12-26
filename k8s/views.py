@@ -14,21 +14,21 @@ class Pos(APIView):
 
     def __init__(self):
 
-        config_dir = os.path.abspath(os.path.dirname(__file__))
-        config_file = os.path.join(config_dir, "./config")
-        print("config dir", config_dir)
-        print("config_file path", config_file)
-
-        config.load_kube_config(config_file=config_file)
-
-        self.v1 = client.CoreV1Api()
-
-        configuration = kubernetes.client.Configuration()
-        # Configure API key authorization: BearerToken
-        # configuration.api_key['authorization'] = 'YOUR_API_KEY'
-        # Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
-        # configuration.api_key_prefix['authorization'] = 'Bearer'
-        configuration.host = "http://localhost"
+        # config_dir = os.path.abspath(os.path.dirname(__file__))
+        # config_file = os.path.join(config_dir, ".\config")
+        # print("config dir", config_dir)
+        # print("config_file path", config_file)
+        #
+        # config.load_kube_config(config_file=config_file)
+        #
+        # self.v1 = client.CoreV1Api()
+        #
+        # configuration = kubernetes.client.Configuration()
+        # # Configure API key authorization: BearerToken
+        # # configuration.api_key['authorization'] = 'YOUR_API_KEY'
+        # # Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
+        # # configuration.api_key_prefix['authorization'] = 'Bearer'
+        # configuration.host = "http://localhost"
         '''
         [root@master ~]# kubectl describe secrets dashboard-admin-token-w6586
         Name:         dashboard-admin-token-w6586

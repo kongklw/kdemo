@@ -12,7 +12,7 @@ class User(AbstractUser):
     avatar: 'https://wpimg.wallstcn.com/f778738c-e4f8-4870-b634-56703b4acafe.gif',
     '''
     phone = models.CharField(max_length=11, unique=True, verbose_name="phone number")
-    role_id = models.IntegerField(null=True, blank=True)
+    # role_id = models.IntegerField(null=True, blank=True)
     introduction = models.CharField(max_length=100, null=True)
     avatar = models.CharField(max_length=200, null=True)
 
