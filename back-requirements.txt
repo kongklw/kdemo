@@ -26,4 +26,4 @@ sqlparse==0.5.1
 tzdata==2024.2
 urllib3==2.2.3
 websocket-client==1.8.0
-uWSGI==2.0.26
+#uWSGI==2.0.26
