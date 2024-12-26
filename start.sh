@@ -13,6 +13,12 @@ done
 
 unzip -o frontend/dist.zip -d frontend/
 
+# 更新pip版本
+RUN /usr/local/bin/python -m pip install --upgrade pip
+
+# 安装项目依赖
+RUN pip install -r requirements.txt
+
 # python manage.py collectstatic --noinput&&
 python manage.py makemigrations&&
 python manage.py migrate&&
