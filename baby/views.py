@@ -7,6 +7,9 @@ from .serializers import BabyInfoSerializer, FeedMilkSerializer, SleepLogSeriali
 from utils import convert_seconds, convert_string_datetime
 from datetime import datetime
 from zoneinfo import ZoneInfo
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class BabyInfoView(APIView):
@@ -28,33 +31,38 @@ class BabyInfoView(APIView):
 
 class FeedMilkView(APIView):
     def get(self, request, *args, **kwargs):
-        user = request.user
-        params = request.query_params
-        date = params.get("date")
-        queryset = FeedMilk.objects.filter(user=user.id, feed_time__gte=date).order_by("feed_time")
-        serializer = FeedMilkSerializer(queryset, many=True)
-        result_data = serializer.data
-        pre_time = None
-        for item in result_data:
-            if pre_time is None:
-                item['time_different'] = '今日第一顿'
-                pre_time = convert_string_datetime(item.get("feed_time"))
+        try:
+            user = request.user
+            params = request.query_params
+            date = params.get("date")
+            queryset = FeedMilk.objects.filter(user=user.id, feed_time__gte=date).order_by("feed_time")
+            serializer = FeedMilkSerializer(queryset, many=True)
+            result_data = serializer.data
+            pre_time = None
+            for item in result_data:
+                if pre_time is None:
+                    item['time_different'] = '今日第一顿'
+                    pre_time = convert_string_datetime(item.get("feed_time"))
 
-                '''计算第一个数据与第二个数据时间差'''
-            else:
-                this_feed_time = convert_string_datetime(item.get("feed_time"))
-                time_different = this_feed_time - pre_time
-                item['time_different'] = convert_seconds(time_different.seconds)
-                pre_time = this_feed_time
+                    '''计算第一个数据与第二个数据时间差'''
+                else:
+                    this_feed_time = convert_string_datetime(item.get("feed_time"))
+                    time_different = this_feed_time - pre_time
+                    item['time_different'] = convert_seconds(time_different.seconds)
+                    pre_time = this_feed_time
 
-        now_time = datetime.now()
-        time_different = now_time - pre_time
-        result_data.append({'feed_time': now_time.strftime('%Y-%m-%dT%H:%M:%S'), 'milk_volume': '还没吃',
-                            'time_different': convert_seconds(time_different.seconds)})
-        result_data.reverse()
+            now_time = datetime.now()
+            time_different = now_time - pre_time
+            result_data.append({'feed_time': now_time.strftime('%Y-%m-%dT%H:%M:%S'), 'milk_volume': '还没吃',
+                                'time_different': convert_seconds(time_different.seconds)})
+            result_data.reverse()
 
-        response = {"code": 200, "data": result_data, "msg": "fetch all success"}
-        return Response(response)
+            response = {"code": 200, "data": result_data, "msg": "fetch all success"}
+            return Response(response)
+        except Exception as exc:
+
+            logger.error(str(exc))
+            return Response({"code": 205, "data": None, "msg": str(exc)})
 
     def post(self, request, *args, **kwargs):
         user = request.user
@@ -114,8 +122,6 @@ class LineChartView(APIView):
         print(lineChartData)
         response_data = {'basicInfo': {'milkVolumes': milkVolumes}, 'lineChartData': lineChartData}
         return Response({'code': 200, 'msg': 'ok', 'data': response_data})
-
-
 
 
 class SleepLogViewSet(MyModelViewSet):
