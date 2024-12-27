@@ -38,6 +38,11 @@ class FeedMilkView(APIView):
             queryset = FeedMilk.objects.filter(user=user.id, feed_time__gte=date).order_by("feed_time")
             serializer = FeedMilkSerializer(queryset, many=True)
             result_data = serializer.data
+
+            # today no data direct return
+            if len(result_data) == 0:
+                return Response({"code": 200, "data": [], "msg": "fetch all success"})
+
             pre_time = None
             for item in result_data:
                 if pre_time is None:
@@ -52,13 +57,14 @@ class FeedMilkView(APIView):
                     pre_time = this_feed_time
 
             now_time = datetime.now()
+
             time_different = now_time - pre_time
             result_data.append({'feed_time': now_time.strftime('%Y-%m-%dT%H:%M:%S'), 'milk_volume': '还没吃',
                                 'time_different': convert_seconds(time_different.seconds)})
             result_data.reverse()
 
-            response = {"code": 200, "data": result_data, "msg": "fetch all success"}
-            return Response(response)
+            return Response({"code": 200, "data": result_data, "msg": "fetch all success"})
+
         except Exception as exc:
             print(exc)
 
