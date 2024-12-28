@@ -14,5 +14,6 @@ urlpatterns = [
     # path('info', views.BabyInfoViewSet),
     path('feed', views.FeedMilkView.as_view()),
     path('temperature', views.TemperatureView.as_view()),
+    path('pants', views.BabyPantsView.as_view()),
     path('line_chart', views.LineChartView.as_view()),
 ]

@@ -35,7 +35,7 @@ class BabyDiapers(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     use_date = models.DateTimeField()
     brand = models.CharField(max_length=100)
-    is_leaked = models.BooleanField(default=False)
+    is_leaked = models.CharField(max_length=10, default='false')
 
 
 class Temperature(models.Model):

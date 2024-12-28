@@ -129,6 +129,37 @@ class TemperatureView(APIView):
             return Response({'code': 205, 'msg': str(exc), 'data': None})
 
 
+class BabyPantsView(APIView):
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        params = request.query_params
+        use_date = params.get("use_date")
+        queryset = BabyDiapers.objects.filter(user=user.id, use_date__gte=use_date).order_by("use_date")
+        serializer = BabyDiapersSerializer(queryset, many=True)
+        result_data = serializer.data
+
+        if len(result_data) == 0:
+            return Response({"code": 200, "data": [], "msg": "fetch all success"})
+
+        return Response({"code": 200, "data": result_data, "msg": "fetch all success"})
+
+    def post(self, request, *args, **kwargs):
+
+        try:
+            user = request.user
+            data = request.data
+            print('接受到的data ', data)
+
+            t = BabyDiapers(user=user, use_date=data.get('use_date'), brand=data.get('brand'),
+                            is_leaked=data.get('is_leaked'))
+            t.save()
+            return Response({'code': 200, 'msg': 'ok', 'data': None})
+
+        except Exception as exc:
+            print(exc)
+            return Response({'code': 205, 'msg': str(exc), 'data': None})
+
+
 class LineChartView(APIView):
 
     def process_chartData(self, data, type, need_total=False):
@@ -212,9 +243,20 @@ class LineChartView(APIView):
         chart_temperature, _ = self.process_chartData(data=temperature_data, type='temperature', need_total=False)
         totalLineChartData['temperature'] = chart_temperature
 
+        '''
+        babyPants
+        '''
 
-        response_data = {'basicInfo': {'milkVolumes': milk_total_count, 'temperature': temperature},
-                         'totalLineChartData': totalLineChartData}
+        bp_queryset = BabyDiapers.objects.filter(user=user_id, use_date__gte=date_time).order_by("use_date")
+        bp_count = bp_queryset.count()
+        serializer = BabyDiapersSerializer(bp_queryset, many=True)
+        bp_data = serializer.data
+        chart_babyPants, babyPants = self.process_chartData(data=bp_data, type='babyPants', need_total=False)
+        totalLineChartData['babyPants'] = chart_babyPants
+
+        response_data = {
+            'basicInfo': {'milkVolumes': milk_total_count, 'temperature': temperature, 'babyPants': bp_count},
+            'totalLineChartData': totalLineChartData}
         print(response_data)
         return Response({'code': 200, 'msg': 'ok', 'data': response_data})
 
@@ -222,11 +264,6 @@ class LineChartView(APIView):
 class SleepLogViewSet(MyModelViewSet):
     serializer_class = SleepLogSerializer
     queryset = SleepLog.objects.all()
-
-
-class BabyDiapersViewSet(MyModelViewSet):
-    serializer_class = BabyDiapersSerializer
-    queryset = BabyDiapers.objects.all()
 
 
 class BabyExpenseViewSet(MyModelViewSet):
