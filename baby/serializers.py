@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import BabyInfo, FeedMilk, SleepLog, BabyDiapers, BabyExpense
+from .models import BabyInfo, FeedMilk, SleepLog, BabyDiapers, BabyExpense,Temperature
 
 class BabyInfoSerializer(serializers.ModelSerializer):
     class Meta:
@@ -12,6 +12,10 @@ class FeedMilkSerializer(serializers.ModelSerializer):
         model = FeedMilk
         fields = '__all__'
 
+class TemperatureSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Temperature
+        fields = '__all__'
 
 class SleepLogSerializer(serializers.ModelSerializer):
     class Meta:

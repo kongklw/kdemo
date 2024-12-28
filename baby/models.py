@@ -22,7 +22,7 @@ class FeedMilk(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     feed_time = models.DateTimeField(blank=False)
     milk_volume = models.IntegerField()
-    time_different = models.DateTimeField(blank=True,null=True)
+    time_different = models.DateTimeField(blank=True, null=True)
 
 
 class SleepLog(models.Model):
@@ -36,6 +36,12 @@ class BabyDiapers(models.Model):
     use_date = models.DateTimeField()
     brand = models.CharField(max_length=100)
     is_leaked = models.BooleanField(default=False)
+
+
+class Temperature(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    date = models.DateField(unique=True, null=False)
+    temperature = models.CharField(max_length=10, null=False)
 
 
 class BabyExpense(models.Model):

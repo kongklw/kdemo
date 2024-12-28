@@ -1,11 +1,11 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from custom import MyModelViewSet
-from .models import BabyInfo, FeedMilk, SleepLog, BabyDiapers, BabyExpense
+from .models import BabyInfo, FeedMilk, SleepLog, BabyDiapers, BabyExpense, Temperature
 from .serializers import BabyInfoSerializer, FeedMilkSerializer, SleepLogSerializer, BabyDiapersSerializer, \
-    BabyExpenseSerializer
-from utils import convert_seconds, convert_string_datetime
-from datetime import datetime
+    BabyExpenseSerializer, TemperatureSerializer
+from utils import convert_seconds, convert_string_datetime, convert_string_date
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import logging
 
@@ -79,12 +79,98 @@ class FeedMilkView(APIView):
         return Response({'code': 200, 'msg': 'ok', 'data': None})
 
 
-class LineChartView(APIView):
+def get_temperature(user_id, date, mode):
+    # date = convert_string_date(date)
+    if mode == 'today':
+        objs = Temperature.objects.filter(user=user_id, date=date)
+    elif mode == 'week':
+        start_date = date - timedelta(days=7)
+        objs = Temperature.objects.filter(user=user_id, date__gte=start_date, date__lte=date)
+    else:
+        objs = Temperature.object.filter(user=user_id, date=date)
+
+    serializer = TemperatureSerializer(objs, many=True)
+    data = serializer.data
+    return data
+
+
+class TemperatureView(APIView):
     def get(self, request, *args, **kwargs):
         user = request.user
         params = request.query_params
+        date = params.get("date")
+        mode = params.get("mode")
+        user_id = user.id
+        date = convert_string_date(date)
+        data = get_temperature(user_id, date, mode)
+        print(data)
+        return Response({'code': 200, 'data': data, 'msg': 'ok'})
+
+    def post(self, request, *args, **kwargs):
+
+        try:
+            user = request.user
+            data = request.data
+            print(data)
+            print(user)
+
+            t = Temperature(user=user, date=data.get('date'), temperature=data.get('temperature'))
+            t.save()
+            return Response({'code': 200, 'msg': 'ok', 'data': None})
+
+        except Exception as exc:
+            print(exc)
+            return Response({'code': 205, 'msg': str(exc), 'data': None})
+
+
+class LineChartView(APIView):
+
+    def process_chartData(self, data, type, need_total=False):
+        total_count = 0
+        xAxisData = []
+        actualData = []
+
+        if type == 'milkVolumes':
+
+            xAxis_name = 'feed_time'
+            actual_name = 'milk_volume'
+            expected_count = 150
+        elif type == 'temperature':
+
+            xAxis_name = 'date'
+            actual_name = 'temperature'
+            expected_count = '36.7'
+
+        elif type == 'babyPants':
+
+            xAxis_name = 'use_date'
+            actual_name = 'is_leaked'
+            expected_count = False
+        else:
+
+            xAxis_name = 'order_time'
+            actual_name = 'amount'
+            expected_count = 3000
+
+        expectedData = [expected_count] * len(data)
+        for item in data:
+            xAxisData.append(item[xAxis_name])
+            if need_total:
+                actual = int(item[actual_name])
+                total_count += actual
+            else:
+                actual = item[actual_name]
+            actualData.append(actual)
+
+        return {'xAxisData': xAxisData, 'expectedData': expectedData, 'actualData': actualData}, total_count
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        user_id = user.id
+        params = request.query_params
         # date = params.get("date")
-        date = datetime.now().strftime('%Y-%m-%d 00:00:00')
+        date_time = datetime.now().strftime('%Y-%m-%d 00:00:00')
+        date = datetime.now().date()
 
         '''
         需要完成奶量数据 两天的
@@ -96,32 +182,34 @@ class LineChartView(APIView):
         '''
         奶量
         '''
-        lineChartData = {
-            'milkVolume': {'xAxisData': [], 'expectedData': [], 'actualData': []},
-            'bodyTemperature': {'xAxisData': [], 'expectedData': [], 'actualData': []},
+        totalLineChartData = {
+            'milkVolumes': {'xAxisData': [], 'expectedData': [], 'actualData': []},
+            'temperature': {'xAxisData': [], 'expectedData': [], 'actualData': []},
             'babyPants': {'xAxisData': [], 'expectedData': [], 'actualData': []},
             'purchases': {'xAxisData': [], 'expectedData': [], 'actualData': []},
         }
-        queryset = FeedMilk.objects.filter(user=user.id, feed_time__gte=date).order_by("feed_time")
+        queryset = FeedMilk.objects.filter(user=user_id, feed_time__gte=date_time).order_by("feed_time")
         serializer = FeedMilkSerializer(queryset, many=True)
         result_data = serializer.data
-        xAxisData = []
-        expectedData = [150] * len(result_data)
-        actualData = []
+        milkVolumes, milk_total_count = self.process_chartData(data=result_data, type='milkVolumes', need_total=True)
+        totalLineChartData['milkVolumes'] = milkVolumes
 
-        milkVolumes = 0
-        for item in result_data:
-            xAxisData.append(item['feed_time'])
-            milk_volume = int(item['milk_volume'])
-            actualData.append(milk_volume)
-            milkVolumes += milk_volume
-        print(xAxisData, expectedData, actualData)
-        lineChartData['milkVolume']['xAxisData'] = xAxisData
-        lineChartData['milkVolume']['expectedData'] = expectedData
-        lineChartData['milkVolume']['actualData'] = actualData
+        '''
+        temperature
+        '''
 
-        print(lineChartData)
-        response_data = {'basicInfo': {'milkVolumes': milkVolumes}, 'lineChartData': lineChartData}
+        t = Temperature.objects.get(user=user_id, date=date)
+        temperature = t.temperature
+
+        temperature_data = get_temperature(user_id, date, 'week')
+        temperature_data.reverse()
+        chart_temperature, _ = self.process_chartData(data=temperature_data, type='temperature', need_total=False)
+        totalLineChartData['temperature'] = chart_temperature
+
+
+        response_data = {'basicInfo': {'milkVolumes': milk_total_count, 'temperature': temperature},
+                         'totalLineChartData': totalLineChartData}
+        print(response_data)
         return Response({'code': 200, 'msg': 'ok', 'data': response_data})
 
 

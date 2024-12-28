@@ -4,6 +4,10 @@ from datetime import datetime
 def convert_string_datetime(string):
     return datetime.strptime(string, '%Y-%m-%dT%H:%M:%S')
 
+def convert_string_date(string):
+    return datetime.strptime(string, '%Y-%m-%d')
+
+
 
 def convert_seconds(seconds):
     hours = seconds // 3600
