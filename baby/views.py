@@ -39,7 +39,6 @@ class FeedMilkView(APIView):
             start_time = params.get("start_time")
             end_time = params.get("end_time")
 
-
             '''
             获取最近一天半的数据
             '''
@@ -100,12 +99,15 @@ def get_temperature(user_id, date, mode):
         objs = Temperature.objects.filter(user=user_id, date=date)
     elif mode == 'week':
         start_date = date - timedelta(days=7)
-        objs = Temperature.objects.filter(user=user_id, date__gte=start_date, date__lte=date)
+        print('温度', start_date, date)
+        objs = Temperature.objects.filter(user=user_id, date__gte=start_date, date__lte=date).order_by('-date')
+        print(objs)
     else:
         objs = Temperature.object.filter(user=user_id, date=date)
 
     serializer = TemperatureSerializer(objs, many=True)
     data = serializer.data
+    print('温度data', data)
     return data
 
 
