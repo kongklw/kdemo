@@ -6,6 +6,8 @@ from .serializers import BabyInfoSerializer, FeedMilkSerializer, SleepLogSeriali
     BabyExpenseSerializer, TemperatureSerializer
 from utils import convert_seconds, convert_string_datetime, convert_string_date
 from datetime import datetime, timedelta
+from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
+from django.db.models import Sum
 from zoneinfo import ZoneInfo
 import logging
 
@@ -34,8 +36,15 @@ class FeedMilkView(APIView):
         try:
             user = request.user
             params = request.query_params
-            date = params.get("date")
-            queryset = FeedMilk.objects.filter(user=user.id, feed_time__gte=date).order_by("feed_time")
+            start_time = params.get("start_time")
+            end_time = params.get("end_time")
+
+
+            '''
+            获取最近一天半的数据
+            '''
+            queryset = FeedMilk.objects.filter(user=user.id, feed_time__gte=start_time,
+                                               feed_time__lte=end_time).order_by("feed_time")
             serializer = FeedMilkSerializer(queryset, many=True)
             result_data = serializer.data
 
@@ -226,6 +235,9 @@ class LineChartView(APIView):
             'purchases': {'xAxisData': [], 'expectedData': [], 'actualData': []},
         }
         queryset = FeedMilk.objects.filter(user=user_id, feed_time__gte=date_time).order_by("feed_time")
+
+        sum_milk = queryset.aggregate(Sum('milk_volume'))
+        print('---------sum milk--------', sum_milk)
         serializer = FeedMilkSerializer(queryset, many=True)
         result_data = serializer.data
         milkVolumes, milk_total_count = self.process_chartData(data=result_data, type='milkVolumes', need_total=True)
@@ -235,8 +247,12 @@ class LineChartView(APIView):
         temperature
         '''
 
-        t = Temperature.objects.get(user=user_id, date=date)
-        temperature = t.temperature
+        try:
+            t = Temperature.objects.get(user=user_id, date=date)
+            temperature = t.temperature
+        except ObjectDoesNotExist or MultipleObjectsReturned as exc:
+            logger.error(str(exc))
+            temperature = '未测'
 
         temperature_data = get_temperature(user_id, date, 'week')
         temperature_data.reverse()
