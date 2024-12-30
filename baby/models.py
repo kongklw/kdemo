@@ -48,3 +48,11 @@ class BabyExpense(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     order_time = models.DateField(blank=False)
     amount = models.IntegerField(blank=False)
+
+
+class TodoList(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    create_time = models.DateField(blank=False, auto_now_add=True)
+    update_time = models.DateField(blank=False, auto_now=True)
+    text = models.CharField(max_length=100, null=False)
+    done = models.BooleanField(null=False)

@@ -12,6 +12,7 @@ from rest_framework.routers import DefaultRouter
 
 urlpatterns = [
     # path('info', views.BabyInfoViewSet),
+    path('todo', views.TodoListView.as_view()),
     path('feed', views.FeedMilkView.as_view()),
     path('temperature', views.TemperatureView.as_view()),
     path('pants', views.BabyPantsView.as_view()),

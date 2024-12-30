@@ -1,9 +1,9 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from custom import MyModelViewSet
-from .models import BabyInfo, FeedMilk, SleepLog, BabyDiapers, BabyExpense, Temperature
+from .models import BabyInfo, FeedMilk, SleepLog, BabyDiapers, BabyExpense, Temperature, TodoList
 from .serializers import BabyInfoSerializer, FeedMilkSerializer, SleepLogSerializer, BabyDiapersSerializer, \
-    BabyExpenseSerializer, TemperatureSerializer
+    BabyExpenseSerializer, TemperatureSerializer, TodoListSerializer
 from utils import convert_seconds, convert_string_datetime, convert_string_date
 from datetime import datetime, timedelta
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
@@ -12,6 +12,50 @@ from zoneinfo import ZoneInfo
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+class TodoListView(APIView):
+    def get(self, request, *args, **kwargs):
+
+        user = request.user
+        create_time = datetime.now().date().strftime('%Y-%m-%d')
+
+        objs = TodoList.objects.filter(user=user, create_time=create_time)
+        serializer = TodoListSerializer(objs, many=True)
+
+        return Response({'code': 200, 'data': serializer.data, 'msg': 'ok'})
+
+    def post(self, request, *args, **kwargs):
+
+        user = request.user
+        data = request.data
+        text = data.get("text")
+        done = data.get("done")
+
+        objs = TodoList(user=user, text=text, done=done)
+        objs.save()
+        return Response({'code': 200, 'data': None, 'msg': 'ok'})
+
+    def put(self, request, *args, **kwargs):
+
+        data = request.data
+        task_id = data.get("id")
+        # data['user']=user.id
+        obj = TodoList.objects.get(id=task_id)
+        serializer = TodoListSerializer(obj, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response({'code': 200, 'data': None, 'msg': 'ok'})
+
+    def delete(self, request, *args, **kwargs):
+
+        data = request.data
+
+        task_id = data.get("id")
+        obj = TodoList.objects.get(id=task_id)
+        obj.delete()
+        return Response({'code': 200, 'data': None, 'msg': 'ok'})
 
 
 class BabyInfoView(APIView):
