@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 class TodoListView(APIView):
     def get(self, request, *args, **kwargs):
-
         user = request.user
         create_time = datetime.now().date().strftime('%Y-%m-%d')
 
@@ -26,7 +25,6 @@ class TodoListView(APIView):
         return Response({'code': 200, 'data': serializer.data, 'msg': 'ok'})
 
     def post(self, request, *args, **kwargs):
-
         user = request.user
         data = request.data
         text = data.get("text")
@@ -37,7 +35,6 @@ class TodoListView(APIView):
         return Response({'code': 200, 'data': None, 'msg': 'ok'})
 
     def put(self, request, *args, **kwargs):
-
         data = request.data
         task_id = data.get("id")
         # data['user']=user.id
@@ -45,11 +42,9 @@ class TodoListView(APIView):
         serializer = TodoListSerializer(obj, data=request.data)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data)
         return Response({'code': 200, 'data': None, 'msg': 'ok'})
 
     def delete(self, request, *args, **kwargs):
-
         data = request.data
 
         task_id = data.get("id")
@@ -135,6 +130,14 @@ class FeedMilkView(APIView):
         else:
             return Response({'code': 205, 'msg': str(serializer.errors), 'data': None})
         return Response({'code': 200, 'msg': 'ok', 'data': None})
+
+    def delete(self, request, *args, **kwargs):
+        print('------delete-------')
+        data = request.data
+        id = data.get("id")
+        obj = FeedMilk.objects.get(id=id)
+        obj.delete()
+        return Response({'code': 200, 'data': None, 'msg': 'ok'})
 
 
 def get_temperature(user_id, date, mode):
