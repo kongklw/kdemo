@@ -113,7 +113,6 @@ class FeedMilkView(APIView):
             return Response({"code": 200, "data": result_data, "msg": "fetch all success"})
 
         except Exception as exc:
-            print(exc)
 
             logger.error(str(exc))
             return Response({"code": 205, "data": None, "msg": str(exc)})
@@ -132,7 +131,7 @@ class FeedMilkView(APIView):
         return Response({'code': 200, 'msg': 'ok', 'data': None})
 
     def delete(self, request, *args, **kwargs):
-        print('------delete-------')
+
         data = request.data
         id = data.get("id")
         obj = FeedMilk.objects.get(id=id)
@@ -146,15 +145,15 @@ def get_temperature(user_id, date, mode):
         objs = Temperature.objects.filter(user=user_id, date=date)
     elif mode == 'week':
         start_date = date - timedelta(days=7)
-        print('温度', start_date, date)
+
         objs = Temperature.objects.filter(user=user_id, date__gte=start_date, date__lte=date).order_by('-date')
-        print(objs)
+
     else:
         objs = Temperature.object.filter(user=user_id, date=date)
 
     serializer = TemperatureSerializer(objs, many=True)
     data = serializer.data
-    print('温度data', data)
+
     return data
 
 
@@ -167,7 +166,7 @@ class TemperatureView(APIView):
         user_id = user.id
         date = convert_string_date(date)
         data = get_temperature(user_id, date, mode)
-        print(data)
+
         return Response({'code': 200, 'data': data, 'msg': 'ok'})
 
     def post(self, request, *args, **kwargs):
@@ -175,15 +174,14 @@ class TemperatureView(APIView):
         try:
             user = request.user
             data = request.data
-            print(data)
-            print(user)
+
 
             t = Temperature(user=user, date=data.get('date'), temperature=data.get('temperature'))
             t.save()
             return Response({'code': 200, 'msg': 'ok', 'data': None})
 
         except Exception as exc:
-            print(exc)
+
             return Response({'code': 205, 'msg': str(exc), 'data': None})
 
 
@@ -206,7 +204,7 @@ class BabyPantsView(APIView):
         try:
             user = request.user
             data = request.data
-            print('接受到的data ', data)
+
 
             t = BabyDiapers(user=user, use_date=data.get('use_date'), brand=data.get('brand'),
                             is_leaked=data.get('is_leaked'))
@@ -214,7 +212,7 @@ class BabyPantsView(APIView):
             return Response({'code': 200, 'msg': 'ok', 'data': None})
 
         except Exception as exc:
-            print(exc)
+
             return Response({'code': 205, 'msg': str(exc), 'data': None})
 
 
@@ -286,7 +284,7 @@ class LineChartView(APIView):
         queryset = FeedMilk.objects.filter(user=user_id, feed_time__gte=date_time).order_by("feed_time")
 
         sum_milk = queryset.aggregate(Sum('milk_volume'))
-        print('---------sum milk--------', sum_milk)
+
         serializer = FeedMilkSerializer(queryset, many=True)
         result_data = serializer.data
         milkVolumes, milk_total_count = self.process_chartData(data=result_data, type='milkVolumes', need_total=True)
@@ -322,7 +320,7 @@ class LineChartView(APIView):
         response_data = {
             'basicInfo': {'milkVolumes': milk_total_count, 'temperature': temperature, 'babyPants': bp_count},
             'totalLineChartData': totalLineChartData}
-        print(response_data)
+
         return Response({'code': 200, 'msg': 'ok', 'data': response_data})
 
 
