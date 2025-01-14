@@ -17,4 +17,6 @@ urlpatterns = [
     path('temperature', views.TemperatureView.as_view()),
     path('pants', views.BabyPantsView.as_view()),
     path('line_chart', views.LineChartView.as_view()),
+    path('expense_list', views.ExpenseListView.as_view()),
+    path('expense', views.ExpenseView.as_view()),
 ]

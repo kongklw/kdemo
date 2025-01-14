@@ -1,13 +1,30 @@
-from datetime import datetime,timedelta
-from utils import convert_seconds, convert_string_datetime, convert_string_date
+import asyncio
+import time
 
-origin = '2024-12-29 00:00:00'
 
-aaa = datetime.now().date()
-print(aaa)
+async def say_after(delay, what):
+    await asyncio.sleep(delay)
+    print(what)
 
-origin_date = datetime.strptime(origin, '%Y-%m-%d %H:%M:%S')
-print(type(origin_date), origin_date)
 
-aim = origin_date-timedelta(hours=12)
-print(aim)
+# async def main():
+#     task1 = asyncio.create_task(say_after(1, 'hello'))
+#     task2 = asyncio.create_task(say_after(2, 'world'))
+#
+#     print(f'start at {time.strftime('%X')}')
+#     await task1
+#     await task2
+#     print(f"finished at {time.strftime('%X')}")
+
+
+async def main():
+    async with asyncio.TaskGroup() as tg:
+        task1 = tg.create_task(say_after(1, 'hello'))
+        task2 = tg.create_task(say_after(2, 'world'))
+        print(f"started at {time.strftime('%X')}")
+    print(f"finished at {time.strftime('%X')}")
+
+    await task1,task2
+
+
+asyncio.run(main())

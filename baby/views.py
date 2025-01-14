@@ -14,6 +14,53 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class ExpenseView(APIView):
+    def get(self, request, *args, **kwargs):
+        user = request.user
+
+        create_time = datetime.now().date().strftime('%Y-%m-%d')
+
+        objs = TodoList.objects.filter(user=user, create_time=create_time)
+        serializer = TodoListSerializer(objs, many=True)
+
+        return Response({'code': 200, 'data': serializer.data, 'msg': 'ok'})
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        data = request.data
+        order_time = data.get("date")
+        name = data.get("name")
+        amount = data.get("amount")
+        tag = data.get("tag")
+
+        objs = BabyExpense(user=user, order_time=order_time, name=name, amount=amount, tag=tag)
+        objs.save()
+        return Response({'code': 200, 'data': None, 'msg': 'ok'})
+
+
+class ExpenseListView(APIView):
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        params = request.query_params
+        monthrange = params.get("monthrange")
+        start_date = monthrange[0]
+        end_date = monthrange[1]
+        name = params.get("name")
+        page = params.get("page")
+        page_size = params.get("pageSize")
+        if name is not None:
+
+            objs = BabyExpense.objects.filter(user=user, name__contains=name, order_time__month__gte=start_date,
+                                              order_time__month__lte=end_date)[(page - 1) * page_size:page * page_size]
+        else:
+
+            objs = BabyExpense.objects.filter(user=user, order_time__month__gte=start_date,
+                                              order_time__month__lte=end_date)[(page - 1) * page_size:page * page_size]
+
+        serializer = BabyExpenseSerializer(objs, many=True)
+        return Response({'code': 200, 'data': serializer.data, 'msg': 'ok'})
+
+
 class TodoListView(APIView):
     def get(self, request, *args, **kwargs):
         user = request.user
@@ -175,7 +222,6 @@ class TemperatureView(APIView):
             user = request.user
             data = request.data
 
-
             t = Temperature(user=user, date=data.get('date'), temperature=data.get('temperature'))
             t.save()
             return Response({'code': 200, 'msg': 'ok', 'data': None})
@@ -204,7 +250,6 @@ class BabyPantsView(APIView):
         try:
             user = request.user
             data = request.data
-
 
             t = BabyDiapers(user=user, use_date=data.get('use_date'), brand=data.get('brand'),
                             is_leaked=data.get('is_leaked'))

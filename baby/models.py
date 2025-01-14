@@ -47,7 +47,11 @@ class Temperature(models.Model):
 class BabyExpense(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     order_time = models.DateField(blank=False)
+    name = models.CharField(max_length=100, null=False)
     amount = models.IntegerField(blank=False)
+    tag = models.CharField(max_length=100, blank=True, null=True)
+    create_time = models.DateField(blank=False, auto_now_add=True)
+    update_time = models.DateField(blank=False, auto_now=True)
 
 
 class TodoList(models.Model):

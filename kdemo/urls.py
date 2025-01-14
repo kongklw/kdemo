@@ -42,5 +42,7 @@ urlpatterns = [
     path("",include(router.urls)),
     # path("baby/",include(babyRouter.urls)),
     path("baby/",include("baby.urls")),
+    path("ai/",include("aistart.urls")),
+
 
 ]
