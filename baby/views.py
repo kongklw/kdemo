@@ -28,7 +28,7 @@ class ExpenseView(APIView):
     def post(self, request, *args, **kwargs):
         user = request.user
         data = request.data
-        order_time = data.get("date")
+        order_time = data.get("order_time")
         name = data.get("name")
         amount = data.get("amount")
         tag = data.get("tag")
@@ -39,23 +39,24 @@ class ExpenseView(APIView):
 
 
 class ExpenseListView(APIView):
-    def get(self, request, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
         user = request.user
-        params = request.query_params
+        params = request.data
+        print('---parms', params)
         monthrange = params.get("monthrange")
         start_date = monthrange[0]
         end_date = monthrange[1]
         name = params.get("name")
-        page = params.get("page")
+        page = params.get("currentPage")
         page_size = params.get("pageSize")
         if name is not None:
 
-            objs = BabyExpense.objects.filter(user=user, name__contains=name, order_time__month__gte=start_date,
-                                              order_time__month__lte=end_date)[(page - 1) * page_size:page * page_size]
+            objs = BabyExpense.objects.filter(user=user, name__contains=name, order_time__gte=start_date,
+                                              order_time__lte=end_date)[(page - 1) * page_size:page * page_size]
         else:
 
-            objs = BabyExpense.objects.filter(user=user, order_time__month__gte=start_date,
-                                              order_time__month__lte=end_date)[(page - 1) * page_size:page * page_size]
+            objs = BabyExpense.objects.filter(user=user, order_time__gte=start_date,
+                                              order_time__lte=end_date)[(page - 1) * page_size:page * page_size]
 
         serializer = BabyExpenseSerializer(objs, many=True)
         return Response({'code': 200, 'data': serializer.data, 'msg': 'ok'})
