@@ -1,3 +1,7 @@
+import json
+import logging
+import base64
+import os
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from custom import MyModelViewSet
@@ -9,9 +13,50 @@ from datetime import datetime, timedelta
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from django.db.models import Sum
 from zoneinfo import ZoneInfo
-import logging
+from decimal import Decimal,getcontext
+
+from utils import alibaba_client
+from kdemo.settings import MEDIA_ROOT
 
 logger = logging.getLogger(__name__)
+
+
+class SleepView(APIView):
+    def get(self, request, *args, **kwargs):
+        user = request.user
+
+        create_time = datetime.now().date().strftime('%Y-%m-%d')
+
+        objs = TodoList.objects.filter(user=user, create_time=create_time)
+        serializer = TodoListSerializer(objs, many=True)
+
+        return Response({'code': 200, 'data': serializer.data, 'msg': 'ok'})
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        data = request.data
+        print('hahha data ---', data)
+        sleep_time = data.get("sleep_time")
+        status = data.get("status")
+        duration = data.get("duration")
+
+        objs = SleepLog(user=user, sleep_time=sleep_time, status=status, duration=duration)
+        objs.save()
+        return Response({'code': 200, 'data': None, 'msg': 'ok'})
+
+
+class SleepListView(APIView):
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        params = request.data
+        print('---parms', params)
+        date = params.get("date")
+        page = params.get("currentPage")
+        page_size = params.get("pageSize")
+
+        objs = SleepLog.objects.filter(user=user, sleep_time__date=date)[(page - 1) * page_size:page * page_size]
+        serializer = SleepLogSerializer(objs, many=True)
+        return Response({'code': 200, 'data': serializer.data, 'msg': 'ok'})
 
 
 class ExpenseView(APIView):
@@ -36,6 +81,92 @@ class ExpenseView(APIView):
         objs = BabyExpense(user=user, order_time=order_time, name=name, amount=amount, tag=tag)
         objs.save()
         return Response({'code': 200, 'data': None, 'msg': 'ok'})
+
+
+class BatchExpenseView(APIView):
+
+    @staticmethod
+    #  读取本地文件，并编码为 BASE64 格式
+    def encode_image(image_path):
+        image_type = image_path[image_path.rindex('.') + 1:].lower()
+        with open(image_path, "rb") as image_file:
+            return image_type, base64.b64encode(image_file.read()).decode("utf-8")
+
+    @classmethod
+    def extract_image_msg(cls, path):
+        image_path = os.path.join(MEDIA_ROOT + path)
+        image_type, base64_image = cls.encode_image(image_path)
+        completion = alibaba_client.chat.completions.create(
+            # model="qwen-vl-ocr",
+            model="qwen-vl-max-latest",
+            messages=[
+                {
+                    "role": "system",
+                    "content": [{"type": "text", "text": "You are a helpful assistant."}],
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            # 需要注意，传入BASE64，图像格式（即image/{format}）需要与支持的图片列表中的Content Type保持一致。"f"是字符串格式化的方法。
+                            # PNG图像：  f"data:image/png;base64,{base64_image}"
+                            # JPEG图像： f"data:image/jpeg;base64,{base64_image}"
+                            # WEBP图像： f"data:image/webp;base64,{base64_image}"
+                            # "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
+                            "image_url": {"url": f"data:image/{image_type};base64,{base64_image}"},
+                            # "min_pixels": 28 * 28 * 4,
+                            # "max_pixels": 28 * 28 * 1280
+                        },
+                        # 为保证识别效果，目前模型内部会统一使用"Read all the text in the image."进行识别，用户输入的文本不会生效。
+                        # {"type": "text", "text": "Read all the text in the image."},
+                        # {"type": "text", "text": "Extract product name,product type,order amount, order time"},
+                        {"type": "text",
+                         "text": "json output, Extract product name,product type,order amount, order time"},
+                    ],
+
+                }
+            ],
+        )
+
+        '''
+        {'product_name': '马博士喂药神器', 'product_type': '自营旗舰店', 'order_amount': '42.7元', 'order_time': '2025-01-14 17:48:28'}
+        '''
+        modelContent = json.loads(completion.choices[0].message.content[7:-3])
+        print(modelContent)
+        res_data = {'image_url':path}
+        for key, value in modelContent.items():
+            if key == 'product_name':
+                res_data['name'] = value
+            elif key == 'order_time':
+                res_data['order_time'] = value
+            elif key == 'order_amount':
+
+                res_data['amount'] = Decimal(value)
+            elif key == 'product_type':
+                res_data['tag'] = value
+
+            else:
+                pass
+
+        return res_data
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        data = request.data
+
+        fileList = data['fileList']
+        for item in fileList:
+            path = item.get('name')
+            obj_data = self.extract_image_msg(path)
+            print(type(obj_data), obj_data)
+            obj_data['user_id'] = user.id
+
+            objs = BabyExpense(user=user, order_time=obj_data.get('order_time'), name=obj_data.get('order_time'),
+                               amount=obj_data.get('amount'), tag=obj_data.get('tag'),image_url=obj_data.get('image_url'))
+            objs.save()
+
+        return Response({'code': 200, 'data': 'haha success', 'msg': 'ok'})
 
 
 class ExpenseListView(APIView):
@@ -368,11 +499,6 @@ class LineChartView(APIView):
             'totalLineChartData': totalLineChartData}
 
         return Response({'code': 200, 'msg': 'ok', 'data': response_data})
-
-
-class SleepLogViewSet(MyModelViewSet):
-    serializer_class = SleepLogSerializer
-    queryset = SleepLog.objects.all()
 
 
 class BabyExpenseViewSet(MyModelViewSet):

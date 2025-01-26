@@ -30,8 +30,8 @@ environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = env('SECRET_KEY')
-OPENAI_API_KEY=env('OPENAI_API_KEY')
-DASHSCOPE_API_KEY=env('DASHSCOPE_API_KEY')
+OPENAI_API_KEY = env('OPENAI_API_KEY')
+DASHSCOPE_API_KEY = env('DASHSCOPE_API_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env('DEBUG')
@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'student',
     'baby',
     'aistart',
+    'fileUpload',
 ]
 
 MIDDLEWARE = [
@@ -216,7 +217,7 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 STATIC_URL = '/static/'
 
 # 设置MEDIA ROOT 和 MEDIA URL
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
 MEDIA_URL = "/media/"
 
 # Default primary key field type

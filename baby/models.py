@@ -28,7 +28,8 @@ class FeedMilk(models.Model):
 class SleepLog(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     sleep_time = models.DateTimeField(blank=False)
-    time_different = models.DateTimeField(blank=True)
+    status = models.CharField(blank=False, max_length=100)
+    duration = models.IntegerField(blank=True, null=True)
 
 
 class BabyDiapers(models.Model):
@@ -46,10 +47,11 @@ class Temperature(models.Model):
 
 class BabyExpense(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    order_time = models.DateField(blank=False)
-    name = models.CharField(max_length=100, null=False)
-    amount = models.IntegerField(blank=False)
+    order_time = models.DateTimeField(blank=False)
+    name = models.CharField(max_length=200, null=False)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, blank=False)
     tag = models.CharField(max_length=100, blank=True, null=True)
+    image_url = models.CharField(max_length=500,blank=True,null=True)
     create_time = models.DateField(blank=False, auto_now_add=True)
     update_time = models.DateField(blank=False, auto_now=True)
 

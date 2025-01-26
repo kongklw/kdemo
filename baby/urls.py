@@ -19,4 +19,7 @@ urlpatterns = [
     path('line_chart', views.LineChartView.as_view()),
     path('expense_list', views.ExpenseListView.as_view()),
     path('expense', views.ExpenseView.as_view()),
+    path('batch_expense', views.BatchExpenseView.as_view()),
+    path('sleep_list', views.SleepListView.as_view()),
+    path('sleep', views.SleepView.as_view()),
 ]
