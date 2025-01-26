@@ -14,8 +14,8 @@ done
 unzip -o frontend/dist.zip -d frontend/
 
 # python manage.py collectstatic --noinput&&
-python manage.py makemigrations&&
-python manage.py migrate&&
+#python manage.py makemigrations&&
+#python manage.py migrate&&
 uwsgi --ini /home/kdemo/uwsgi.ini&&
 tail -f /dev/null
 
