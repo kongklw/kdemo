@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from django.db.models import Sum
 from zoneinfo import ZoneInfo
-from decimal import Decimal,getcontext
+from decimal import Decimal, getcontext
 
 from utils import alibaba_client
 from kdemo.settings import MEDIA_ROOT
@@ -22,25 +22,17 @@ logger = logging.getLogger(__name__)
 
 
 class SleepView(APIView):
-    def get(self, request, *args, **kwargs):
-        user = request.user
-
-        create_time = datetime.now().date().strftime('%Y-%m-%d')
-
-        objs = TodoList.objects.filter(user=user, create_time=create_time)
-        serializer = TodoListSerializer(objs, many=True)
-
-        return Response({'code': 200, 'data': serializer.data, 'msg': 'ok'})
 
     def post(self, request, *args, **kwargs):
         user = request.user
         data = request.data
-        print('hahha data ---', data)
+
         sleep_time = data.get("sleep_time")
         status = data.get("status")
+        describe = data.get("describe")
         duration = data.get("duration")
 
-        objs = SleepLog(user=user, sleep_time=sleep_time, status=status, duration=duration)
+        objs = SleepLog(user=user, sleep_time=sleep_time, status=status, describe=describe, duration=duration)
         objs.save()
         return Response({'code': 200, 'data': None, 'msg': 'ok'})
 
@@ -49,7 +41,7 @@ class SleepListView(APIView):
     def post(self, request, *args, **kwargs):
         user = request.user
         params = request.data
-        print('---parms', params)
+
         date = params.get("date")
         page = params.get("currentPage")
         page_size = params.get("pageSize")
@@ -80,6 +72,18 @@ class ExpenseView(APIView):
 
         objs = BabyExpense(user=user, order_time=order_time, name=name, amount=amount, tag=tag)
         objs.save()
+        return Response({'code': 200, 'data': None, 'msg': 'ok'})
+
+
+class BatchDeleteExpenseView(APIView):
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        data = request.data
+
+        ids = data.get("ids")
+
+        objs = BabyExpense.objects.filter(user=user, id__in=ids)
+        objs.delete()
         return Response({'code': 200, 'data': None, 'msg': 'ok'})
 
 
@@ -134,7 +138,7 @@ class BatchExpenseView(APIView):
         '''
         modelContent = json.loads(completion.choices[0].message.content[7:-3])
         print(modelContent)
-        res_data = {'image_url':path}
+        res_data = {'image_url': path}
         for key, value in modelContent.items():
             if key == 'product_name':
                 res_data['name'] = value
@@ -159,11 +163,12 @@ class BatchExpenseView(APIView):
         for item in fileList:
             path = item.get('name')
             obj_data = self.extract_image_msg(path)
-            print(type(obj_data), obj_data)
+
             obj_data['user_id'] = user.id
 
-            objs = BabyExpense(user=user, order_time=obj_data.get('order_time'), name=obj_data.get('order_time'),
-                               amount=obj_data.get('amount'), tag=obj_data.get('tag'),image_url=obj_data.get('image_url'))
+            objs = BabyExpense(user=user, order_time=obj_data.get('order_time'), name=obj_data.get('name'),
+                               amount=obj_data.get('amount'), tag=obj_data.get('tag'),
+                               image_url=obj_data.get('image_url'))
             objs.save()
 
         return Response({'code': 200, 'data': 'haha success', 'msg': 'ok'})
@@ -173,7 +178,7 @@ class ExpenseListView(APIView):
     def post(self, request, *args, **kwargs):
         user = request.user
         params = request.data
-        print('---parms', params)
+
         monthrange = params.get("monthrange")
         start_date = monthrange[0]
         end_date = monthrange[1]
