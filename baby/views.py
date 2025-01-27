@@ -46,7 +46,8 @@ class SleepListView(APIView):
         page = params.get("currentPage")
         page_size = params.get("pageSize")
 
-        objs = SleepLog.objects.filter(user=user, sleep_time__date=date)[(page - 1) * page_size:page * page_size]
+        objs = SleepLog.objects.filter(user=user, sleep_time__date=date).order_by('-sleep_time')[
+               (page - 1) * page_size:page * page_size]
         serializer = SleepLogSerializer(objs, many=True)
         return Response({'code': 200, 'data': serializer.data, 'msg': 'ok'})
 
@@ -178,6 +179,7 @@ class ExpenseListView(APIView):
     def post(self, request, *args, **kwargs):
         user = request.user
         params = request.data
+        print('expense ---', params)
 
         monthrange = params.get("monthrange")
         start_date = monthrange[0]
@@ -188,12 +190,19 @@ class ExpenseListView(APIView):
         if name is not None:
 
             objs = BabyExpense.objects.filter(user=user, name__contains=name, order_time__gte=start_date,
-                                              order_time__lte=end_date)[(page - 1) * page_size:page * page_size]
+                                              order_time__lte=end_date).order_by('-order_time')
+
+            # objs = BabyExpense.objects.filter(user=user, name__contains=name, order_time__gte=start_date,
+            #                                   order_time__lte=end_date).order_by('-order_time')[
+            #        (page - 1) * page_size:page * page_size]
         else:
 
             objs = BabyExpense.objects.filter(user=user, order_time__gte=start_date,
-                                              order_time__lte=end_date)[(page - 1) * page_size:page * page_size]
+                                              order_time__lte=end_date).order_by('-order_time')
 
+            # objs = BabyExpense.objects.filter(user=user, order_time__gte=start_date,
+            #                               order_time__lte=end_date).order_by('-order_time')[
+            #    (page - 1) * page_size:page * page_size]
         serializer = BabyExpenseSerializer(objs, many=True)
         return Response({'code': 200, 'data': serializer.data, 'msg': 'ok'})
 
