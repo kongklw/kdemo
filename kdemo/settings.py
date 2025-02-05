@@ -32,6 +32,8 @@ environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 SECRET_KEY = env('SECRET_KEY')
 OPENAI_API_KEY = env('OPENAI_API_KEY')
 DASHSCOPE_API_KEY = env('DASHSCOPE_API_KEY')
+LANGSMITH_TRACING = env('DASHSCOPE_API_KEY')
+LANGSMITH_API_KEY = env('DASHSCOPE_API_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env('DEBUG')

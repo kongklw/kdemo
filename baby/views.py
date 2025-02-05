@@ -1,7 +1,9 @@
 import json
 import logging
 import base64
-import os
+import os, uuid
+import time
+import asyncio
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from custom import MyModelViewSet
@@ -14,9 +16,11 @@ from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from django.db.models import Sum
 from zoneinfo import ZoneInfo
 from decimal import Decimal, getcontext
-
 from utils import alibaba_client
+from utils.chatApp import obtain_app
 from kdemo.settings import MEDIA_ROOT
+from langchain_core.messages import HumanMessage
+import concurrent.futures
 
 logger = logging.getLogger(__name__)
 
@@ -98,80 +102,100 @@ class BatchExpenseView(APIView):
             return image_type, base64.b64encode(image_file.read()).decode("utf-8")
 
     @classmethod
-    def extract_image_msg(cls, path):
+    def process_image_msg(cls, path, user):
+        thread_id = uuid.uuid1()
         image_path = os.path.join(MEDIA_ROOT + path)
         image_type, base64_image = cls.encode_image(image_path)
-        completion = alibaba_client.chat.completions.create(
-            # model="qwen-vl-ocr",
-            model="qwen-vl-max-latest",
-            messages=[
+        input_message = [HumanMessage(
+            content=[
+
+                {"type": "text",
+                 "text": "describe product name if there are multiple merge lines,product category,pay amount ignore money units and pay time"},
+                # {"type": "text", "text": "Return a JSON object with {'product_name':product_name,'order_amount':order_amount,'product_categories':product_categories,'order_time':order_time}"},
                 {
-                    "role": "system",
-                    "content": [{"type": "text", "text": "You are a helpful assistant."}],
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/{image_type};base64,{base64_image}"},
                 },
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image_url",
-                            # 需要注意，传入BASE64，图像格式（即image/{format}）需要与支持的图片列表中的Content Type保持一致。"f"是字符串格式化的方法。
-                            # PNG图像：  f"data:image/png;base64,{base64_image}"
-                            # JPEG图像： f"data:image/jpeg;base64,{base64_image}"
-                            # WEBP图像： f"data:image/webp;base64,{base64_image}"
-                            # "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
-                            "image_url": {"url": f"data:image/{image_type};base64,{base64_image}"},
-                            # "min_pixels": 28 * 28 * 4,
-                            # "max_pixels": 28 * 28 * 1280
-                        },
-                        # 为保证识别效果，目前模型内部会统一使用"Read all the text in the image."进行识别，用户输入的文本不会生效。
-                        # {"type": "text", "text": "Read all the text in the image."},
-                        # {"type": "text", "text": "Extract product name,product type,order amount, order time"},
-                        {"type": "text",
-                         "text": "json output, Extract product name,product type,order amount, order time"},
-                    ],
+            ]
+        )]
 
-                }
-            ],
-        )
+        app = obtain_app(type='json')
+        language = "english"
+        config = {"configurable": {"thread_id": thread_id}}
+        output = app.invoke({"messages": input_message, "language": language}, config)
+        modelContent = json.loads(output["messages"][-1].content)
 
-        '''
-        {'product_name': '马博士喂药神器', 'product_type': '自营旗舰店', 'order_amount': '42.7元', 'order_time': '2025-01-14 17:48:28'}
-        '''
-        modelContent = json.loads(completion.choices[0].message.content[7:-3])
-        print(modelContent)
+
         res_data = {'image_url': path}
         for key, value in modelContent.items():
             if key == 'product_name':
-                res_data['name'] = value
-            elif key == 'order_time':
+                res_data['name'] = str(value)
+            elif key == 'pay_time':
                 res_data['order_time'] = value
-            elif key == 'order_amount':
-
+            elif key == 'pay_amount':
                 res_data['amount'] = Decimal(value)
-            elif key == 'product_type':
-                res_data['tag'] = value
-
+            elif key == 'product_category':
+                res_data['tag'] = str(value)
             else:
                 pass
 
-        return res_data
+        objs = BabyExpense(user=user, order_time=res_data.get('order_time'), name=res_data.get('name'),
+                           amount=res_data.get('amount'), tag=res_data.get('tag'),
+                           image_url=res_data.get('image_url'))
+        objs.save()
 
-    def post(self, request, *args, **kwargs):
+        return f'ok {thread_id}'
+
+    @staticmethod
+    async def process(cls, request):
         user = request.user
         data = request.data
-
         fileList = data['fileList']
-        for item in fileList:
-            path = item.get('name')
-            obj_data = self.extract_image_msg(path)
+        task_list = []
+        async with asyncio.TaskGroup() as tg:
+            for item in fileList:
+                path = item.get('name')
+                task = tg.create_task(cls.process_image_msg(path, user))
+                task_list.append(task)
 
-            obj_data['user_id'] = user.id
+        for item in task_list:
+            print(f"Both tasks have completed now: {item.result()}")
 
-            objs = BabyExpense(user=user, order_time=obj_data.get('order_time'), name=obj_data.get('name'),
-                               amount=obj_data.get('amount'), tag=obj_data.get('tag'),
-                               image_url=obj_data.get('image_url'))
-            objs.save()
+    def post(self, request, *args, **kwargs):
+        start = time.time()
 
+        user = request.user
+        data = request.data
+        fileList = data['fileList']
+
+        # 我们可以使用一个 with 语句来确保线程被迅速清理
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            # 开始加载操作并以每个 Future 对象的 URL 对其进行标记
+            future_to_llm = {executor.submit(self.process_image_msg, item.get('name'), user): item for item in fileList}
+            for future in concurrent.futures.as_completed(future_to_llm):
+                url = future_to_llm[future]
+                try:
+                    data = future.result()
+
+                except Exception as exc:
+                    print('%r generated an exception: %s' % (url, exc))
+                else:
+                    print('%r page is %d bytes' % (url, len(data)))
+
+        # task_list = []
+        # async with asyncio.TaskGroup() as tg:
+        #     for item in fileList:
+        #         path = item.get('name')
+        #         task = tg.create_task(self.process_image_msg(path, user))
+        #         task_list.append(task)
+        #
+        # for item in task_list:
+        #     print(f"Both tasks have completed now: {item.result()}")
+
+        # asyncio.run(self.process(request))
+
+        end = time.time()
+        print('total wast time are :', end - start)
         return Response({'code': 200, 'data': 'haha success', 'msg': 'ok'})
 
 
@@ -286,7 +310,7 @@ class FeedMilkView(APIView):
             pre_time = None
             for item in result_data:
                 if pre_time is None:
-                    item['time_different'] = '今日第一顿'
+                    item['time_different'] = '起点顿'
                     pre_time = convert_string_datetime(item.get("feed_time"))
 
                     '''计算第一个数据与第二个数据时间差'''
