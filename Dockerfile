@@ -1,8 +1,9 @@
 # 建立 python 3.9环境
-FROM python:3.10
+FROM python:3.12
 
 # 安装netcat
-RUN apt-get update && apt install -y netcat
+#RUN apt-get update && apt install -y netcat
+#RUN apt-get update
 
 # image author
 MAINTAINER kdemo
