@@ -125,7 +125,6 @@ class BatchExpenseView(APIView):
         output = app.invoke({"messages": input_message, "language": language}, config)
         modelContent = json.loads(output["messages"][-1].content)
 
-
         res_data = {'image_url': path}
         for key, value in modelContent.items():
             if key == 'product_name':
@@ -208,14 +207,16 @@ class ExpenseListView(APIView):
         monthrange = params.get("monthrange")
         start_date = monthrange[0]
         end_date = monthrange[1]
-        name = params.get("name")
+        name = params.get("name")  # search name
         page = params.get("currentPage")
         page_size = params.get("pageSize")
         if name is not None:
-
-            objs = BabyExpense.objects.filter(user=user, name__contains=name, order_time__gte=start_date,
+            print('------name---',name)
+            objs = BabyExpense.objects.filter(user=user, name__contains=name,
+                                              order_time__gte=start_date,
                                               order_time__lte=end_date).order_by('-order_time')
-
+            search_amount = objs.aggregate(amount=Sum('amount', default=0))
+            print('总花费', search_amount)
             # objs = BabyExpense.objects.filter(user=user, name__contains=name, order_time__gte=start_date,
             #                                   order_time__lte=end_date).order_by('-order_time')[
             #        (page - 1) * page_size:page * page_size]
@@ -223,12 +224,16 @@ class ExpenseListView(APIView):
 
             objs = BabyExpense.objects.filter(user=user, order_time__gte=start_date,
                                               order_time__lte=end_date).order_by('-order_time')
+            search_amount = objs.aggregate(amount=Sum('amount', default=0))
+            print('总花费', search_amount)
 
             # objs = BabyExpense.objects.filter(user=user, order_time__gte=start_date,
             #                               order_time__lte=end_date).order_by('-order_time')[
             #    (page - 1) * page_size:page * page_size]
         serializer = BabyExpenseSerializer(objs, many=True)
-        return Response({'code': 200, 'data': serializer.data, 'msg': 'ok'})
+
+        data = {"expense_list": serializer.data, "search_amount": search_amount["amount"]}
+        return Response({'code': 200, 'data': data, 'msg': 'ok'})
 
 
 class TodoListView(APIView):

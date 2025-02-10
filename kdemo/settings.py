@@ -109,10 +109,11 @@ DATABASES = {
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://redis:6379/1",  # 这里直接使用redis别名作为host ip地址
+        "LOCATION": "redis://47.95.15.228:6379/1",  # 这里直接使用redis别名作为host ip地址
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
             "PASSWORD": env("REDIS_PASSWORD"),  # 换成你自己密码
+            "CONNECTION_POOL_KWARGS": {"max_connections": 100},
         },
     }
 }

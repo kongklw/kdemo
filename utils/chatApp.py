@@ -1,7 +1,7 @@
 import os
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, BaseMessage, trim_messages
-from langgraph.checkpoint.memory import MemorySaver
+from kdemo import memory
 from langgraph.graph import START, MessagesState, StateGraph
 from langchain_core.prompts import ChatPromptTemplate, ChatMessagePromptTemplate, MessagesPlaceholder
 from typing import Sequence
@@ -31,6 +31,16 @@ prompt_template = ChatPromptTemplate.from_messages(
     ]
 )
 
+common_prompt_template = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            "You are a helpful assistant. Answer all questions to the best of your ability",
+        ),
+        MessagesPlaceholder(variable_name="messages")
+    ]
+)
+
 
 class State(TypedDict):
     messages: Annotated[Sequence[BaseMessage], add_messages]
@@ -39,7 +49,7 @@ class State(TypedDict):
 
 def call_model(state: State):
     prompt = prompt_template.invoke(state)
-    response = json_model.invoke(prompt)
+    response = model.invoke(prompt)
 
     # trimmed_messages = trimmer.invoke(state["messages"])
     # prompt = prompt_template.invoke(
@@ -61,7 +71,5 @@ def obtain_app(type='norm'):
         workflow.add_node('model', call_model_json)
     else:
         workflow.add_node('model', call_model)
-
-    memory = MemorySaver()
     app = workflow.compile(checkpointer=memory)
     return app
