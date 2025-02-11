@@ -37,13 +37,19 @@ class BabyDiapers(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     use_date = models.DateTimeField()
     brand = models.CharField(max_length=100)
+    tabActiveName = models.CharField(max_length=100, default="peeing")
     is_leaked = models.CharField(max_length=10, default='false')
+    peeing_color = models.IntegerField(null=True, blank=True)
+    stool_shape = models.IntegerField(null=True, blank=True)
+    stool_color = models.IntegerField(null=True, blank=True)
+    describe = models.TextField(null=True, blank=True)
 
 
 class Temperature(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    date = models.DateField(unique=True, null=False)
+    measure_date = models.DateField(unique=True, null=False)
     temperature = models.CharField(max_length=10, null=False)
+    status = models.CharField(max_length=100, null=True, blank=True)
 
 
 class BabyExpense(models.Model):

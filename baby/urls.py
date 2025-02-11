@@ -1,5 +1,5 @@
 from django.urls import path, include
-from . import views
+from . import views, temperature_views,baby_pants_view,dashboard_views
 from rest_framework.routers import DefaultRouter
 
 # babyRouter = DefaultRouter()
@@ -12,10 +12,11 @@ from rest_framework.routers import DefaultRouter
 
 urlpatterns = [
     # path('info', views.BabyInfoViewSet),
+    path('dashboard', dashboard_views.DashBoardView.as_view()),
     path('todo', views.TodoListView.as_view()),
     path('feed', views.FeedMilkView.as_view()),
-    path('temperature', views.TemperatureView.as_view()),
-    path('pants', views.BabyPantsView.as_view()),
+    path('temperature', temperature_views.TemperatureView.as_view()),
+    path('pants', baby_pants_view.BabyPantsView.as_view()),
     path('line_chart', views.LineChartView.as_view()),
     path('expense_list', views.ExpenseListView.as_view()),
     path('expense', views.ExpenseView.as_view()),

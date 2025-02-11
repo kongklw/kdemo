@@ -11,7 +11,7 @@ from .models import BabyInfo, FeedMilk, SleepLog, BabyDiapers, BabyExpense, Temp
 from .serializers import BabyInfoSerializer, FeedMilkSerializer, SleepLogSerializer, BabyDiapersSerializer, \
     BabyExpenseSerializer, TemperatureSerializer, TodoListSerializer
 from utils import convert_seconds, convert_string_datetime, convert_string_date
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from django.db.models import Sum
 from zoneinfo import ZoneInfo
@@ -23,6 +23,21 @@ from langchain_core.messages import HumanMessage
 import concurrent.futures
 
 logger = logging.getLogger(__name__)
+
+
+class DashBoardView(APIView):
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        # dashboard 展示 一天的喝奶量，总共的消费总和。今日的尿不湿片数。今日的体温情况.
+        today = date.today()
+        print(today)
+
+        total_milk_volumes = FeedMilk.objects.filter(user=user.id, feed_time__date=today).aggregate(
+            total_milk_volumes=Sum('milk_volume', default=0))
+        # queryset = FeedMilk.objects.filter(user=user.id)
+        print(total_milk_volumes)
+
+        return Response({'code': 200, 'data': None, 'msg': 'ok'})
 
 
 class SleepView(APIView):
@@ -211,7 +226,7 @@ class ExpenseListView(APIView):
         page = params.get("currentPage")
         page_size = params.get("pageSize")
         if name is not None:
-            print('------name---',name)
+            print('------name---', name)
             objs = BabyExpense.objects.filter(user=user, name__contains=name,
                                               order_time__gte=start_date,
                                               order_time__lte=end_date).order_by('-order_time')
@@ -300,9 +315,6 @@ class FeedMilkView(APIView):
             start_time = params.get("start_time")
             end_time = params.get("end_time")
 
-            '''
-            获取最近一天半的数据
-            '''
             queryset = FeedMilk.objects.filter(user=user.id, feed_time__gte=start_time,
                                                feed_time__lte=end_time).order_by("feed_time")
             serializer = FeedMilkSerializer(queryset, many=True)
@@ -364,14 +376,15 @@ class FeedMilkView(APIView):
 def get_temperature(user_id, date, mode):
     # date = convert_string_date(date)
     if mode == 'today':
-        objs = Temperature.objects.filter(user=user_id, date=date)
+        objs = Temperature.objects.filter(user=user_id, measure_date=date)
     elif mode == 'week':
         start_date = date - timedelta(days=7)
 
-        objs = Temperature.objects.filter(user=user_id, date__gte=start_date, date__lte=date).order_by('-date')
+        objs = Temperature.objects.filter(user=user_id, measure_date__gte=start_date, measure_date__lte=date).order_by(
+            '-measure_date')
 
     else:
-        objs = Temperature.object.filter(user=user_id, date=date)
+        objs = Temperature.object.filter(user=user_id, measure_date=date)
 
     serializer = TemperatureSerializer(objs, many=True)
     data = serializer.data
@@ -450,7 +463,7 @@ class LineChartView(APIView):
             expected_count = 150
         elif type == 'temperature':
 
-            xAxis_name = 'date'
+            xAxis_name = 'measure_date'
             actual_name = 'temperature'
             expected_count = '36.7'
 
@@ -481,6 +494,7 @@ class LineChartView(APIView):
         user = request.user
         user_id = user.id
         params = request.query_params
+        print(params)
         # date = params.get("date")
         date_time = datetime.now().strftime('%Y-%m-%d 00:00:00')
         date = datetime.now().date()
@@ -515,7 +529,7 @@ class LineChartView(APIView):
         '''
 
         try:
-            t = Temperature.objects.get(user=user_id, date=date)
+            t = Temperature.objects.get(user=user_id, measure_date=date)
             temperature = t.temperature
         except ObjectDoesNotExist or MultipleObjectsReturned as exc:
             logger.error(str(exc))
