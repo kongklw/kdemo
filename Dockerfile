@@ -36,7 +36,7 @@ RUN pip install -r requirements.txt
 RUN sed -i 's/\r//' ./start.sh
 
 # 给start.sh可执行权限
-RUN chmod +x ./start.sh
+RUN chmod 777 ./start.sh
 
 # 数据迁移，并使用uwsgi启动服务
 ENTRYPOINT /bin/bash ./start.sh
