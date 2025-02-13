@@ -1,26 +1,10 @@
-import json
 import logging
-import base64
-import os, uuid
-import time
-import asyncio
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from .models import BabyDiapers, PantsBrandModel
+from .serializers import BabyDiapersSerializer, PantsBrandSerializer
 from custom import MyModelViewSet
-from .models import BabyInfo, FeedMilk, SleepLog, BabyDiapers, BabyExpense, Temperature, TodoList
-from .serializers import BabyInfoSerializer, FeedMilkSerializer, SleepLogSerializer, BabyDiapersSerializer, \
-    BabyExpenseSerializer, TemperatureSerializer, TodoListSerializer
-from utils import convert_seconds, convert_string_datetime, convert_string_date
-from datetime import datetime, timedelta, date
-from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
-from django.db.models import Sum
-from zoneinfo import ZoneInfo
-from decimal import Decimal, getcontext
-from utils import alibaba_client
-from utils.chatApp import obtain_app
-from kdemo.settings import MEDIA_ROOT
-from langchain_core.messages import HumanMessage
-import concurrent.futures
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +96,7 @@ class BabyPantsView(APIView):
             """
             user = request.user
             data = request.data
+
             use_date = data.get("use_date")
             tabActiveName = data.get("tabActiveName")
             peeing_color = data.get("peeing_color")
@@ -154,3 +139,29 @@ class BabyPantsView(APIView):
         obj = BabyDiapers.objects.get(id=id)
         obj.delete()
         return Response({'code': 200, 'data': None, 'msg': 'ok'})
+
+
+class BrandPantsView(MyModelViewSet):
+
+    def get(self, request, *args, **kwargs):
+
+        user = request.user
+        objs = PantsBrandModel.objects.all(user=user.id)
+        serializer = PantsBrandSerializer(data=objs, many=True)
+        if serializer.is_valid():
+            data = serializer.data
+            response = {'code': 200, "data": data, "msg": "ok"}
+        else:
+            response = {'code': 200, "data": None, "msg": str(serializer.errors)}
+
+        return Response(response)
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        data = request.data
+        brand_name = data.get("brand_name")
+
+        obj = PantsBrandModel(user=user.id, brand_name=brand_name)
+        obj.save()
+
+        return Response(response={'code': 200, "data": None, "msg": "ok"})

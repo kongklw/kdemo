@@ -33,6 +33,18 @@ class SleepLog(models.Model):
     duration = models.IntegerField(blank=True, null=True)
 
 
+class PantsBrandModel(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    brand_name = models.CharField(max_length=100)
+    created_at = models.DateField(auto_now_add=True)
+    updated_at = models.DateField(auto_now=True)
+
+    class Meta:
+        db_table = "baby_pants_brand"
+        verbose_name = "baby_pants_brand"
+        verbose_name_plural = verbose_name
+
+
 class BabyDiapers(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     use_date = models.DateTimeField()

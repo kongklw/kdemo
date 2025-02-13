@@ -1,5 +1,5 @@
 from django.urls import path, include
-from . import views, temperature_views,baby_pants_view,dashboard_views
+from . import views, temperature_views, baby_pants_view, dashboard_views, sleep_views
 from rest_framework.routers import DefaultRouter
 
 # babyRouter = DefaultRouter()
@@ -22,6 +22,6 @@ urlpatterns = [
     path('expense', views.ExpenseView.as_view()),
     path('batch_expense', views.BatchExpenseView.as_view()),
     path('batch_delete_expense', views.BatchDeleteExpenseView.as_view()),
-    path('sleep_list', views.SleepListView.as_view()),
-    path('sleep', views.SleepView.as_view()),
+    path('sleep_list', sleep_views.SleepListView.as_view()),
+    path('sleep', sleep_views.SleepView.as_view()),
 ]
