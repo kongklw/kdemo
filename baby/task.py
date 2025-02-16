@@ -1,3 +1,5 @@
+"""
+
 # Create your tasks here
 #
 # from demoapp.models import Widget
@@ -17,3 +19,5 @@ def init_todo(init_text):
             objs = TodoList(user=user, text=text)
             objs.save()
     print("已经结束")
+
+"""
