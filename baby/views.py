@@ -254,6 +254,7 @@ class ExpenseListView(APIView):
 class TodoListView(APIView):
     def get(self, request, *args, **kwargs):
         user = request.user
+        print('view-----------todo')
         create_time = datetime.now().date().strftime('%Y-%m-%d')
 
         objs = TodoList.objects.filter(user=user, create_time=create_time)

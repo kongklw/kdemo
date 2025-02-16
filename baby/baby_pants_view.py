@@ -1,3 +1,4 @@
+import json
 import logging
 
 from rest_framework.views import APIView
@@ -59,16 +60,15 @@ class BabyPantsView(APIView):
 
         for item in serializer.data:
             status = item.get("tabActiveName")
-            item_dict = {"id": item.get("id"), "status": statusMap.get(status), "use_date": item.get("use_date")}
+            item_dict = {"id": item.get("id"), "status": statusMap.get(status), "describe": item.get("describe"),
+                         "use_date": item.get("use_date")}
             if status == "peeing":
-                item_dict["peeing"] = peeingColorMap.get(item.get("peeing_color"))
+                item_dict["peeing"] = item.get("peeing_color")
             elif status == "stool":
-                item_dict["stool"] = stoolColorMap.get(item.get("stool_color")) + stoolShapeMap.get(
-                    item.get("stool_shape"))
+                item_dict["stool"] = item.get("stool_color") + item.get("stool_shape")
             elif status == "peeing-stool":
-                item_dict["peeing"] = peeingColorMap.get(item.get("peeing_color"))
-                item_dict["stool"] = stoolColorMap.get(item.get("stool_color")) + stoolShapeMap.get(
-                    item.get("stool_shape"))
+                item_dict["peeing"] = item.get("peeing_color")
+                item_dict["stool"] = item.get("stool_color") + item.get("stool_shape")
             else:
                 pass
 
@@ -96,12 +96,14 @@ class BabyPantsView(APIView):
             """
             user = request.user
             data = request.data
+            print(data)
 
             use_date = data.get("use_date")
             tabActiveName = data.get("tabActiveName")
             peeing_color = data.get("peeing_color")
             stool_color = data.get("stool_color")
-            stool_shape = data.get("stool_shape")
+            stool_shape_list = data.get("stool_shape_list")
+            stool_shape = "#".join(stool_shape_list)
             brand = data.get("brand")
             is_leaked = data.get("is_leaked")
             describe = data.get("describe")

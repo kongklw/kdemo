@@ -14,6 +14,12 @@ class TodoListSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class TodoTableSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TodoList
+        fields = ['create_time', 'text', 'done']
+
+
 class FeedMilkSerializer(serializers.ModelSerializer):
     class Meta:
         model = FeedMilk

@@ -51,9 +51,9 @@ class BabyDiapers(models.Model):
     brand = models.CharField(max_length=100)
     tabActiveName = models.CharField(max_length=100, default="peeing")
     is_leaked = models.CharField(max_length=10, default='false')
-    peeing_color = models.IntegerField(null=True, blank=True)
-    stool_shape = models.IntegerField(null=True, blank=True)
-    stool_color = models.IntegerField(null=True, blank=True)
+    peeing_color = models.CharField(max_length=100, null=True, blank=True)
+    stool_shape = models.CharField(max_length=200, null=True, blank=True)
+    stool_color = models.CharField(max_length=100, null=True, blank=True)
     describe = models.TextField(null=True, blank=True)
 
 
@@ -80,4 +80,4 @@ class TodoList(models.Model):
     create_time = models.DateField(blank=False, auto_now_add=True)
     update_time = models.DateField(blank=False, auto_now=True)
     text = models.CharField(max_length=100, null=False)
-    done = models.BooleanField(null=False)
+    done = models.BooleanField(default=False)

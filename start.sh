@@ -13,11 +13,13 @@ done
 
 unzip -o frontend/dist.zip -d frontend/
 
+RUN pip install -r requirements.txt
+
 # python manage.py collectstatic --noinput&&
 #python manage.py makemigrations&&
 #python manage.py migrate&&
 echo "start uwsgi-----------------"
 uwsgi --ini /home/kdemo/uwsgi.ini
 echo "end uwsgi-----------------"
-
+tail -f /dev/null
 exec "$@"

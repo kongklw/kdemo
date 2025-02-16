@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'baby',
     'aistart',
     'fileUpload',
+    'django_celery_results',
 ]
 
 MIDDLEWARE = [
@@ -94,6 +95,38 @@ WSGI_APPLICATION = 'kdemo.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/3.2/ref/settings/#databases
 
+REDIS_HOST = env("REDIS_HOST")
+REDIS_PORT = env("REDIS_PORT")
+REDIS_CELERY_DB = env("REDIS_CELERY_DB")
+REDIS_CACHE_DB = env("REDIS_CACHE_DB")
+REDIS_PASSWORD = env("REDIS_PASSWORD")
+
+# Celery Configuration Options
+
+# 使用 Redis 作为消息代理（broker）来传递任务消息，连接地址为 localhost:6379/0，并提供密码 mypassword 进行身份验证。
+CELERY_BROKER_URL = f'redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_CELERY_DB}'
+
+CELERY_TIMEZONE = 'Asia/Shanghai'
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60
+CELERYD_CONCURRENCY = 10
+CELERYD_PREFETCH_MULTIPLIER = 4
+# 每个worker执行了多少次任务后就会死掉，建议数量大一些
+CELERYD_MAX_TASKS_PER_CHILD = 200
+# celery任务执行结果的超时时间
+CELERY_TASK_RESULT_EXPIRES = 1200
+# 单个任务的运行时间限制，否则会被杀死
+CELERYD_TASK_TIME_LIMIT = 5 * 60
+
+CELERY_RESULT_BACKEND = 'django-db'
+CELERY_CACHE_BACKEND = 'default'
+# 指定发送到代理（broker）的任务消息序列化格式为 JSON 格式。
+CELERY_TASK_SERIALIZER = 'json'
+# 指定从结果后端获取的结果序列化格式为 JSON 格式。
+CELERY_RESULT_SERIALIZER = 'json'
+# 指定支持接收的内容类型为 JSON 格式。
+CELERY_ACCEPT_CONTENT = ['json']
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
@@ -107,15 +140,17 @@ DATABASES = {
 
 # 设置redis缓存。这里密码为redis.conf里设置的密码
 CACHES = {
+
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://47.95.15.228:6379/1",  # 这里直接使用redis别名作为host ip地址
+        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_CACHE_DB}",  # 这里直接使用redis别名作为host ip地址
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
             "PASSWORD": env("REDIS_PASSWORD"),  # 换成你自己密码
             "CONNECTION_POOL_KWARGS": {"max_connections": 100},
         },
-    }
+    },
+
 }
 
 # Password validation
