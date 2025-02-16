@@ -39,5 +39,5 @@ RUN sed -i 's/\r//' ./start.sh
 RUN chmod 777 ./start.sh
 
 # 数据迁移，并使用uwsgi启动服务
-#ENTRYPOINT /bin/bash ./start.sh
-ENTRYPOINT ["./start.sh"]
+ENTRYPOINT /bin/bash ./start.sh
+
