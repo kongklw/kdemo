@@ -127,6 +127,9 @@ CELERY_RESULT_SERIALIZER = 'json'
 # 指定支持接收的内容类型为 JSON 格式。
 CELERY_ACCEPT_CONTENT = ['json']
 
+CELERY_ENABLE_UTC = False
+DJANGO_CELERY_BEAT_TZ_AWARE = False
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
