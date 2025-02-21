@@ -64,12 +64,15 @@ def call_model_json(state: State):
     return {"messages": [response]}
 
 
-def obtain_app(type='norm'):
+def obtain_app(type='norm', need_mem=True):
     workflow = StateGraph(state_schema=State)
     workflow.add_edge(START, 'model')
     if type == 'json':
         workflow.add_node('model', call_model_json)
     else:
         workflow.add_node('model', call_model)
-    app = workflow.compile(checkpointer=memory)
+    if need_mem is False:
+        app = workflow.compile()
+    else:
+        app = workflow.compile(checkpointer=memory)
     return app

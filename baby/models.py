@@ -18,6 +18,25 @@ class BabyInfo(models.Model):
     updated_at = models.DateField(auto_now=True)
 
 
+class GrowingBlogModel(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    title = models.CharField(null=False, max_length=200)
+    content = models.TextField(null=True, blank=True)
+    created_time = models.DateField(auto_now_add=True)
+    updated_time = models.DateField(auto_now=True)
+    number_of_comments = models.IntegerField(default=0)
+    number_of_pingbacks = models.IntegerField(default=0)
+    rating = models.IntegerField(default=5)
+
+    def __str__(self):
+        return self.title
+
+    class Meta:
+        db_table = "baby_growing_blog"
+        verbose_name = "baby_growing_blog"
+        verbose_name_plural = verbose_name
+
+
 class FeedMilk(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     feed_time = models.DateTimeField(blank=False)

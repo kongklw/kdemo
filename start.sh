@@ -13,7 +13,7 @@
 
 unzip -o frontend/dist.zip -d frontend/
 
-pip install -r requirements.txt
+#pip install -r requirements.txt
 
 # python manage.py collectstatic --noinput&&
 #python manage.py makemigrations&&

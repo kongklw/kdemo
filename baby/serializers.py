@@ -1,5 +1,23 @@
 from rest_framework import serializers
-from .models import BabyInfo, FeedMilk, SleepLog, BabyDiapers, BabyExpense, Temperature, TodoList, PantsBrandModel
+from .models import (BabyInfo, FeedMilk, SleepLog, BabyDiapers,
+                     BabyExpense, Temperature, TodoList, PantsBrandModel, GrowingBlogModel
+                     )
+
+
+class GrowingBlogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GrowingBlogModel
+        exclude = ['user', ]
+        # fields = '__all__'
+
+    # def create(self, validated_data):
+    #     data = self.context["user"]
+    #     print('hhhhhhhhhhhhhhhhhhhhhhh', type(data), data)
+    #     return GrowingBlogModel.objects.create(user=self.context["user"], **validated_data)
+
+    def create(self, validated_data):
+        validated_data["user"] = self.context["request"].user
+        return super().create(validated_data)
 
 
 class BabyInfoSerializer(serializers.ModelSerializer):
