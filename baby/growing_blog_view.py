@@ -20,7 +20,7 @@ class AIGenView(APIView):
             app = obtain_app(type="json", need_mem=False)
             language = "chinese"
 
-            content = f"""根据下面的内容，以一个父母的口吻和心情，写一个带有标题的不超过200字的文章。\
+            content = f"""根据下面的内容，写一个带有标题不超过200字的文章。\
                         ```{content}```\
                         结果以json格式返回，key 为 title, content
             """
@@ -43,7 +43,7 @@ class GrowingBlogView(APIView):
     def get(self, request, *args, **kwargs):
         user = request.user
 
-        objs = GrowingBlogModel.objects.filter(user=user)
+        objs = GrowingBlogModel.objects.filter(user=user).order_by('-id')
         serializer = GrowingBlogSerializer(objs, many=True)
 
         return Response({"code": 200, "data": serializer.data,

@@ -1,4 +1,6 @@
 import os.path
+from uuid import uuid1
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from kdemo.settings import MEDIA_ROOT
@@ -11,7 +13,8 @@ class CommonFileUpload(APIView):
 
     def post(self, request, *args, **kwargs):
         file = request.FILES.get('file', None)
-        name = file.name
+        file_name = file.name
+        name = str(uuid1()) + file_name
         path = os.path.join(MEDIA_ROOT + name)
 
         with open(path, 'wb') as f:

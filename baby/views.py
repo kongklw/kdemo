@@ -40,6 +40,72 @@ class DashBoardView(APIView):
         return Response({'code': 200, 'data': None, 'msg': 'ok'})
 
 
+class FeedMilkView(APIView):
+    def get(self, request, *args, **kwargs):
+        try:
+            user = request.user
+            params = request.query_params
+            start_time = params.get("start_time")
+            end_time = params.get("end_time")
+
+            queryset = FeedMilk.objects.filter(user=user.id, feed_time__gte=start_time,
+                                               feed_time__lte=end_time).order_by("feed_time")
+            serializer = FeedMilkSerializer(queryset, many=True)
+            result_data = serializer.data
+
+            # today no data direct return
+            if len(result_data) == 0:
+                return Response({"code": 200, "data": [], "msg": "fetch all success"})
+
+            pre_time = None
+            for item in result_data:
+                if pre_time is None:
+                    item['time_different'] = '起点顿'
+                    pre_time = convert_string_datetime(item.get("feed_time"))
+
+                    '''计算第一个数据与第二个数据时间差'''
+                else:
+                    this_feed_time = convert_string_datetime(item.get("feed_time"))
+                    time_different = this_feed_time - pre_time
+                    item['time_different'] = convert_seconds(time_different.seconds)
+                    pre_time = this_feed_time
+
+            now_time = datetime.now()
+
+            time_different = now_time - pre_time
+            result_data.append({'feed_time': now_time.strftime('%Y-%m-%dT%H:%M:%S'), 'milk_volume': '还没吃',
+                                'time_different': convert_seconds(time_different.seconds)})
+            result_data.reverse()
+
+            return Response({"code": 200, "data": result_data, "msg": "fetch all success"})
+
+        except Exception as exc:
+
+            logger.error(str(exc))
+            return Response({"code": 205, "data": None, "msg": str(exc)})
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        data = request.data
+
+        ser_data = {'feed_time': data.get("feed_time"), 'milk_volume': int(data.get("milk_volume")), 'user': user.id}
+
+        serializer = FeedMilkSerializer(data=ser_data)
+        if serializer.is_valid():
+            serializer.save()
+        else:
+            return Response({'code': 205, 'msg': str(serializer.errors), 'data': None})
+        return Response({'code': 200, 'msg': 'ok', 'data': None})
+
+    def delete(self, request, *args, **kwargs):
+
+        data = request.data
+        id = data.get("id")
+        obj = FeedMilk.objects.get(id=id)
+        obj.delete()
+        return Response({'code': 200, 'data': None, 'msg': 'ok'})
+
+
 class SleepView(APIView):
 
     def post(self, request, *args, **kwargs):
@@ -306,72 +372,6 @@ class BabyInfoView(APIView):
         if serializer.is_valid():
             serializer.save()
         return Response({'code': 200, 'msg': 'ok', 'data': None})
-
-
-class FeedMilkView(APIView):
-    def get(self, request, *args, **kwargs):
-        try:
-            user = request.user
-            params = request.query_params
-            start_time = params.get("start_time")
-            end_time = params.get("end_time")
-
-            queryset = FeedMilk.objects.filter(user=user.id, feed_time__gte=start_time,
-                                               feed_time__lte=end_time).order_by("feed_time")
-            serializer = FeedMilkSerializer(queryset, many=True)
-            result_data = serializer.data
-
-            # today no data direct return
-            if len(result_data) == 0:
-                return Response({"code": 200, "data": [], "msg": "fetch all success"})
-
-            pre_time = None
-            for item in result_data:
-                if pre_time is None:
-                    item['time_different'] = '起点顿'
-                    pre_time = convert_string_datetime(item.get("feed_time"))
-
-                    '''计算第一个数据与第二个数据时间差'''
-                else:
-                    this_feed_time = convert_string_datetime(item.get("feed_time"))
-                    time_different = this_feed_time - pre_time
-                    item['time_different'] = convert_seconds(time_different.seconds)
-                    pre_time = this_feed_time
-
-            now_time = datetime.now()
-
-            time_different = now_time - pre_time
-            result_data.append({'feed_time': now_time.strftime('%Y-%m-%dT%H:%M:%S'), 'milk_volume': '还没吃',
-                                'time_different': convert_seconds(time_different.seconds)})
-            result_data.reverse()
-
-            return Response({"code": 200, "data": result_data, "msg": "fetch all success"})
-
-        except Exception as exc:
-
-            logger.error(str(exc))
-            return Response({"code": 205, "data": None, "msg": str(exc)})
-
-    def post(self, request, *args, **kwargs):
-        user = request.user
-        data = request.data
-
-        ser_data = {'feed_time': data.get("feed_time"), 'milk_volume': int(data.get("milk_volume")), 'user': user.id}
-
-        serializer = FeedMilkSerializer(data=ser_data)
-        if serializer.is_valid():
-            serializer.save()
-        else:
-            return Response({'code': 205, 'msg': str(serializer.errors), 'data': None})
-        return Response({'code': 200, 'msg': 'ok', 'data': None})
-
-    def delete(self, request, *args, **kwargs):
-
-        data = request.data
-        id = data.get("id")
-        obj = FeedMilk.objects.get(id=id)
-        obj.delete()
-        return Response({'code': 200, 'data': None, 'msg': 'ok'})
 
 
 def get_temperature(user_id, date, mode):

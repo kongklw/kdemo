@@ -1,6 +1,7 @@
 from django.urls import path, include
 from . import (views, temperature_views, baby_pants_view, todo_views,
-               dashboard_views, sleep_views, expense_views, growing_blog_view)
+               dashboard_views, sleep_views, expense_views, growing_blog_view,
+               breast_feed_views)
 from rest_framework.routers import DefaultRouter
 
 # babyRouter = DefaultRouter()
@@ -24,7 +25,8 @@ urlpatterns = [
     path('todo_table', todo_views.TodoTableView.as_view()),
 
     # feed
-    path('feed', views.FeedMilkView.as_view()),
+    path('feed', breast_feed_views.FeedMilkView.as_view()),
+    path('feed_chart', breast_feed_views.FeedChart.as_view()),
 
     # temperature
     path('temperature', temperature_views.TemperatureView.as_view()),
