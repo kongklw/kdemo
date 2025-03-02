@@ -105,7 +105,7 @@ def process_feed_chart(user_id):
     chartData = {
         'current_day': {'xAxisData': [], 'lowData': [], 'highData': [], 'actualData': [], 'titleText': '今日奶量',
                         'yMin': 0},
-        'latest_week': {'xAxisData': [], 'lowData': [], 'highData': [], 'actualData': [], 'titleText': '周奶量',
+        'latest_week': {'xAxisData': [], 'lowData': [], 'highData': [], 'actualData': [], 'titleText': '近15天',
                         'yMin': 600},
         'basic_info': {'milkVolumes': 0, 'refermilkVolumes': '800-1000'}}
 
@@ -118,9 +118,11 @@ def process_feed_chart(user_id):
         chartData['basic_info']['milkVolumes'] = rows[0]['total_volume']
 
     current_objs = FeedMilk.objects.raw(
-        f"SELECT id, CONCAT(HOUR(feed_time),':',LPAD(MINUTE(feed_time),2,'0')) as time, milk_volume FROM kdemo.baby_feedmilk where user_id={user_id} and date(feed_time)=date(NOW());")
+        # f"SELECT id, CONCAT(HOUR(feed_time),':',LPAD(MINUTE(feed_time),2,'0')) as time, milk_volume FROM kdemo.baby_feedmilk where user_id={user_id} and date(feed_time)=date(NOW());")
+        f"SELECT id, CONCAT(HOUR(feed_time),':',LPAD(MINUTE(feed_time),2,'0')) as time, milk_volume FROM kdemo.baby_feedmilk where user_id={user_id} and date(feed_time)=CURDATE() ORDER BY feed_time ASC;")
 
     for obj in current_objs:
+
         chartData['current_day']['lowData'].append(120)
         chartData['current_day']['highData'].append(210)
         chartData['current_day']['xAxisData'].append(obj.time)
@@ -128,7 +130,7 @@ def process_feed_chart(user_id):
 
     with connection.cursor() as cursor:
         cursor.execute(
-            "SELECT sum(milk_volume) as day_volumes, date(feed_time) as date FROM kdemo.baby_feedmilk where user_id=%s and DATE_SUB(CURDATE(), INTERVAL 7 DAY) < date(feed_time) group by date(feed_time);",
+            "SELECT sum(milk_volume) as day_volumes, date(feed_time) as date FROM kdemo.baby_feedmilk where user_id=%s and DATE_SUB(CURDATE(), INTERVAL 15 DAY) < date(feed_time) group by date(feed_time);",
             [user_id])
         rows = dictfetchall(cursor)
         for row in rows:
