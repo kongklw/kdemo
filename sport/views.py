@@ -23,11 +23,12 @@ class SportView(APIView):
 
         serializer = SportSerializer(data=data)
         if serializer.is_valid():
-            serializer.save()
+            # 关联当前用户
+            serializer.save(user=request.user)
+            return Response({"code": 200, "data": None, "msg": "create successful"})
         else:
             print(serializer.errors)
-
-        return Response({"code": 200, "data": None, "msg": "create successful"})
+            return Response({"code": 400, "data": None, "msg": str(serializer.errors)})
 
 
 class SportList(APIView):
@@ -39,7 +40,8 @@ class SportList(APIView):
         print('shifou ', request.user.is_authenticated)
         print('shifou2222  ', request.user)
 
-        queryset = SportModels.objects.all()
+        # 过滤当前用户的数据
+        queryset = SportModels.objects.filter(user=request.user)
         serializer = SportSerializer(queryset, many=True)
         data = serializer.data
         response = {"code": 200, "data": data, "msg": "fetch all success"}

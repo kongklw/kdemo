@@ -9,6 +9,7 @@ class BabyInfo(models.Model):
         MALE = 'M', 'MALE'
         FEMALE = 'F', 'FEMALE'
 
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
     name = models.CharField(max_length=100)
     birthday = models.DateField(blank=True)
     birth_weight = models.IntegerField()

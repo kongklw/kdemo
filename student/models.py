@@ -1,4 +1,5 @@
 from django.db import models
+from users.models import User
 
 
 # Create your models here.
@@ -8,6 +9,7 @@ class Student(models.Model):
         FEMALE = 'F', 'FEMALE'
         OTHERS = 'O', "OTHERS"
 
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
     name = models.CharField(max_length=20)
     age = models.IntegerField()
     gender = models.CharField(max_length=10, choices=Gender.choices)

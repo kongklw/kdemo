@@ -359,9 +359,13 @@ class TodoListView(APIView):
 
 class BabyInfoView(APIView):
     def get(self, request, *args, **kwargs):
+        user = request.user
         params = request.query_params
         name = params.get("name")
-        queryset = BabyInfo.objects.get(name=name)
+        # 使用 filter 和 first 避免找不到或返回多个对象时报错，并加上 user 过滤
+        queryset = BabyInfo.objects.filter(user=user, name=name).first()
+        if not queryset:
+             return Response({"code": 404, "data": None, "msg": "Not found"})
         serializer = BabyInfoSerializer(queryset)
         response = {"code": 200, "data": serializer.data, "msg": "success"}
         return Response(response)
@@ -370,8 +374,10 @@ class BabyInfoView(APIView):
         data = request.data
         serializer = BabyInfoSerializer(data=data)
         if serializer.is_valid():
-            serializer.save()
-        return Response({'code': 200, 'msg': 'ok', 'data': None})
+            # 保存时关联当前用户
+            serializer.save(user=request.user)
+            return Response({'code': 200, 'msg': 'ok', 'data': None})
+        return Response({'code': 400, 'msg': str(serializer.errors), 'data': None})
 
 
 def get_temperature(user_id, date, mode):
@@ -562,3 +568,9 @@ class LineChartView(APIView):
 class BabyExpenseViewSet(MyModelViewSet):
     serializer_class = BabyExpenseSerializer
     queryset = BabyExpense.objects.all()
+
+    def get_queryset(self):
+        return BabyExpense.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
