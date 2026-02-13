@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, date
 from django.db.models import Count
 import pandas as pd
 from itertools import groupby
+import os
 
 logger = logging.getLogger(__name__)
 
