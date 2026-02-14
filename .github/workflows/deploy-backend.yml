@@ -1,0 +1,28 @@
+name: deploy-backend
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'kdemo/**'
+      - 'docker-compose.yaml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to ECS
+        uses: appleboy/ssh-action@v0.1.8
+        with:
+          host: ${{ secrets.ECS_HOST }}
+          username: ${{ secrets.ECS_USER }}
+          key: ${{ secrets.ECS_SSH_KEY }}
+          port: ${{ secrets.ECS_PORT }}
+          script: |
+            set -e
+            cd ${{ secrets.ECS_WORKDIR }}
+            bash kdemo/deploy.sh
