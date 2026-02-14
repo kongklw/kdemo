@@ -17,6 +17,7 @@ class SportView(APIView):
         response单个sport
         test auto deploy with github
         test backend auto deploy
+        test test
         '''
         return Response()
 
