@@ -15,13 +15,13 @@ jobs:
       - name: Deploy to ECS
         uses: appleboy/ssh-action@v0.1.8
         with:
-          host: ${{ secrets.ECS_HOST }}
-          username: ${{ secrets.ECS_USER }}
-          key: ${{ secrets.ECS_SSH_KEY }}
-          port: ${{ secrets.ECS_PORT }}
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
           script: |
             set -e
-            cd ${{ secrets.ECS_WORKDIR }}
+            cd ${{ secrets.PROJECT_PATH }}
             if command -v docker-compose >/dev/null 2>&1; then dc="docker-compose"; else dc="docker compose"; fi
             $dc build web
             $dc up -d web
