@@ -15,6 +15,7 @@ class SportView(APIView):
     def get(self, request, *args, **kwargs):
         '''
         response单个sport
+        test auto deploy with github
         '''
         return Response()
 
