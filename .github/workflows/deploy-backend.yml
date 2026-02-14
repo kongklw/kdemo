@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'kdemo/**'
-      - 'docker-compose.yaml'
 
 jobs:
   deploy:
@@ -25,4 +22,8 @@ jobs:
           script: |
             set -e
             cd ${{ secrets.ECS_WORKDIR }}
-            bash kdemo/deploy.sh
+            if command -v docker-compose >/dev/null 2>&1; then dc="docker-compose"; else dc="docker compose"; fi
+            $dc build web
+            $dc up -d web
+            $dc exec -T web python manage.py migrate
+            $dc exec -T web python manage.py collectstatic --noinput
