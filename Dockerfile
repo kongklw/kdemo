@@ -1,5 +1,5 @@
 # 建立 python 3.9环境
-FROM python:3.12
+FROM m.daocloud.io/library/python:3.12-slim
 
 # 安装netcat
 #RUN apt-get update && apt install -y netcat
