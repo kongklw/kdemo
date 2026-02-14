@@ -60,9 +60,22 @@ class LoginView(APIView):
     def post(self, request, *args, **kwargs):
         data = request.data
         try:
-            username = data.get("username")
+            username = data.get("username") # 这里前端传过来的是手机号，字段名还是username
             password = data.get("password")
+            
+            # 1. 先尝试用 username 直接登录 (兼容原有逻辑)
             user = authenticate(username=username, password=password)
+            
+            # 2. 如果失败，尝试用手机号登录
+            if user is None:
+                try:
+                    user_obj = User.objects.get(phone=username)
+                    # 找到用户后，再验证密码
+                    if user_obj.check_password(password):
+                        user = user_obj
+                except User.DoesNotExist:
+                    pass
+            
             print(user)
 
             if user is not None:
@@ -75,7 +88,7 @@ class LoginView(APIView):
             else:
                 # No backend authenticated the credentials
 
-                response = {"code": 205, "data": None, "msg": 'none this user'}
+                response = {"code": 205, "data": None, "msg": '账号或密码错误'}
             return Response(response)
         except Exception as exc:
             response = {"code": 205, "data": None, "msg": str(exc)}
