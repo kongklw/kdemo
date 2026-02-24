@@ -12,6 +12,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Zip Backend
+        run: zip -r backend.zip . -x "media/*" "static/*" ".git/*" "__pycache__/*" "*.pyc"
+
+      - name: Upload Backend
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
+          source: "backend.zip"
+          target: "${{ secrets.PROJECT_PATH }}/kdemo/"
+
       - name: Deploy to ECS
         uses: appleboy/ssh-action@v0.1.8
         with:
@@ -21,6 +34,16 @@ jobs:
           port: 22
           script: |
             set -e
+            
+            # Update backend code
+            cd ${{ secrets.PROJECT_PATH }}/kdemo
+            if [ -f "backend.zip" ]; then
+              echo "Unzipping backend code..."
+              unzip -o backend.zip
+              rm backend.zip
+            fi
+            
+            # Go to project root for docker-compose
             cd ${{ secrets.PROJECT_PATH }}
             if command -v docker-compose >/dev/null 2>&1; then dc="docker-compose"; else dc="docker compose"; fi
             $dc build web
