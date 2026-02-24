@@ -90,6 +90,7 @@ class BabyExpense(models.Model):
     name = models.CharField(max_length=200, null=False)
     amount = models.DecimalField(max_digits=10, decimal_places=2, blank=False)
     tag = models.CharField(max_length=100, blank=True, null=True)
+    expense_type = models.CharField(max_length=10, default='expense')
     image_url = models.CharField(max_length=500, blank=True, null=True)
     create_time = models.DateField(blank=False, auto_now_add=True)
     update_time = models.DateField(blank=False, auto_now=True)

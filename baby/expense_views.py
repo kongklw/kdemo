@@ -43,9 +43,31 @@ class ExpenseView(APIView):
         name = data.get("name")
         amount = data.get("amount")
         tag = data.get("tag")
+        expense_type = data.get("expense_type", "expense")
 
-        objs = BabyExpense(user=user, order_time=order_time, name=name, amount=amount, tag=tag)
+        objs = BabyExpense(user=user, order_time=order_time, name=name, amount=amount, tag=tag,
+                           expense_type=expense_type)
         objs.save()
+        return Response({'code': 200, 'data': None, 'msg': 'ok'})
+
+    def put(self, request, *args, **kwargs):
+        user = request.user
+        data = request.data
+        pk = data.get("id")
+        if not pk:
+            return Response({'code': 400, 'msg': 'id is required'})
+
+        try:
+            obj = BabyExpense.objects.get(id=pk, user=user)
+        except BabyExpense.DoesNotExist:
+            return Response({'code': 404, 'msg': 'not found'})
+
+        obj.order_time = data.get("order_time", obj.order_time)
+        obj.name = data.get("name", obj.name)
+        obj.amount = data.get("amount", obj.amount)
+        obj.tag = data.get("tag", obj.tag)
+        obj.expense_type = data.get("expense_type", obj.expense_type)
+        obj.save()
         return Response({'code': 200, 'data': None, 'msg': 'ok'})
 
 
