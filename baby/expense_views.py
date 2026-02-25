@@ -95,7 +95,19 @@ class BatchExpenseView(APIView):
     @classmethod
     def process_image_msg(cls, path, user):
         thread_id = uuid.uuid1()
-        image_path = os.path.join(MEDIA_ROOT + path)
+        # Fix: Normalize path separators and join correctly
+        path = path.replace('\\', '/')
+        
+        # Robustness check: if file not found at path, try looking in 'files/' subdirectory
+        # This handles cases where path might be just a filename but file is in files/
+        image_path = os.path.join(MEDIA_ROOT, path)
+        if not os.path.exists(image_path):
+            alt_path = os.path.join(MEDIA_ROOT, 'files', os.path.basename(path))
+            if os.path.exists(alt_path):
+                # Update path to include files/ prefix
+                path = 'files/' + os.path.basename(path)
+                image_path = alt_path
+
         image_type, base64_image = cls.encode_image(image_path)
         input_message = [HumanMessage(
             content=[
@@ -199,31 +211,39 @@ class ExpenseListView(APIView):
         start_date = monthrange[0]
         end_date = monthrange[1]
         name = params.get("name")  # search name
-        page = params.get("currentPage")
-        page_size = params.get("pageSize")
-        if name is not None:
+        page = int(params.get("currentPage", 1))
+        page_size = int(params.get("pageSize", 20))
 
+        if name is not None:
             objs = BabyExpense.objects.filter(user=user, name__contains=name,
                                               order_time__gte=start_date,
                                               order_time__lte=end_date).order_by('-order_time')
-            search_amount = objs.aggregate(amount=Sum('amount', default=0))
-
-            # objs = BabyExpense.objects.filter(user=user, name__contains=name, order_time__gte=start_date,
-            #                                   order_time__lte=end_date).order_by('-order_time')[
-            #        (page - 1) * page_size:page * page_size]
         else:
-
             objs = BabyExpense.objects.filter(user=user, order_time__gte=start_date,
                                               order_time__lte=end_date).order_by('-order_time')
-            search_amount = objs.aggregate(amount=Sum('amount', default=0))
 
-            # objs = BabyExpense.objects.filter(user=user, order_time__gte=start_date,
-            #                               order_time__lte=end_date).order_by('-order_time')[
-            #    (page - 1) * page_size:page * page_size]
+        # Calculate stats before pagination
+        range_income = objs.filter(expense_type='income').aggregate(amount=Sum('amount', default=0))
+        range_expense = objs.filter(expense_type='expense').aggregate(amount=Sum('amount', default=0))
+
+        total_count = objs.count()
+        
+        # Apply pagination
+        start_index = (page - 1) * page_size
+        end_index = page * page_size
+        objs = objs[start_index:end_index]
+
         serializer = BabyExpenseSerializer(objs, many=True)
 
-        total_amount = BabyExpense.objects.filter(user=user).aggregate(amount=Sum('amount', default=0))
+        all_income = BabyExpense.objects.filter(user=user, expense_type='income').aggregate(amount=Sum('amount', default=0))
+        all_expense = BabyExpense.objects.filter(user=user, expense_type='expense').aggregate(amount=Sum('amount', default=0))
 
-        data = {"expense_list": serializer.data, "search_amount": search_amount["amount"],
-                "total_amount": total_amount["amount"], }
+        data = {
+            "expense_list": serializer.data, 
+            "total": total_count,
+            "range_income": range_income["amount"], 
+            "range_expense": range_expense["amount"],
+            "all_income": all_income["amount"], 
+            "all_expense": all_expense["amount"]
+        }
         return Response({'code': 200, 'data': data, 'msg': 'ok'})
