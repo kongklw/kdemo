@@ -222,9 +222,14 @@ class ExpenseListView(APIView):
 
         queryset = BabyExpense.objects.filter(**filter_kwargs).order_by('-order_time')
 
-        # Calculate statistics BEFORE pagination
-        all_income = queryset.filter(expense_type='income').aggregate(Sum('amount'))['amount__sum'] or 0
-        all_expense = queryset.filter(expense_type='expense').aggregate(Sum('amount'))['amount__sum'] or 0
+        # Calculate range statistics (based on current filters)
+        range_income = queryset.filter(expense_type='income').aggregate(Sum('amount'))['amount__sum'] or 0
+        range_expense = queryset.filter(expense_type='expense').aggregate(Sum('amount'))['amount__sum'] or 0
+
+        # Calculate total statistics (all data for user)
+        all_queryset = BabyExpense.objects.filter(user=user)
+        all_income = all_queryset.filter(expense_type='income').aggregate(Sum('amount'))['amount__sum'] or 0
+        all_expense = all_queryset.filter(expense_type='expense').aggregate(Sum('amount'))['amount__sum'] or 0
         
         # Paginate
         start = (page_num - 1) * page_size
@@ -241,8 +246,8 @@ class ExpenseListView(APIView):
                 'total': total,
                 'all_income': all_income,
                 'all_expense': all_expense,
-                'range_income': all_income,
-                'range_expense': all_expense
+                'range_income': range_income,
+                'range_expense': range_expense
             },
             'msg': 'ok'
         })
