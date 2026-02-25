@@ -96,6 +96,17 @@ class BabyExpense(models.Model):
     update_time = models.DateField(blank=False, auto_now=True)
 
 
+class ExpenseTag(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    name = models.CharField(max_length=50)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'name')
+        verbose_name = "expense_tag"
+        verbose_name_plural = verbose_name
+
+
 class TodoList(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     create_time = models.DateField(blank=False, auto_now_add=True)

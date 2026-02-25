@@ -7,7 +7,7 @@ import asyncio
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from custom import MyModelViewSet
-from .models import BabyInfo, FeedMilk, SleepLog, BabyDiapers, BabyExpense, Temperature, TodoList
+from .models import BabyInfo, FeedMilk, SleepLog, BabyDiapers, BabyExpense, Temperature, TodoList, ExpenseTag
 from .serializers import BabyInfoSerializer, FeedMilkSerializer, SleepLogSerializer, BabyDiapersSerializer, \
     BabyExpenseSerializer, TemperatureSerializer, TodoListSerializer
 from utils import convert_seconds, convert_string_datetime, convert_string_date
@@ -206,44 +206,63 @@ class ExpenseListView(APIView):
         user = request.user
         params = request.data
 
+        page_size = params.get('page_size', 20)
+        page_num = params.get('page_num', 1)
 
-        monthrange = params.get("monthrange")
-        start_date = monthrange[0]
-        end_date = monthrange[1]
-        name = params.get("name")  # search name
-        page = int(params.get("currentPage", 1))
-        page_size = int(params.get("pageSize", 20))
+        # Build filter query
+        filter_kwargs = {'user': user}
 
-        if name is not None:
-            objs = BabyExpense.objects.filter(user=user, name__contains=name,
-                                              order_time__gte=start_date,
-                                              order_time__lte=end_date).order_by('-order_time')
-        else:
-            objs = BabyExpense.objects.filter(user=user, order_time__gte=start_date,
-                                              order_time__lte=end_date).order_by('-order_time')
+        if params.get('name'):
+            filter_kwargs['name__contains'] = params.get('name')
 
-        # Calculate stats before pagination
-        range_income = objs.filter(expense_type='income').aggregate(amount=Sum('amount', default=0))
-        range_expense = objs.filter(expense_type='expense').aggregate(amount=Sum('amount', default=0))
+        if params.get('monthrange'):
+            start_date = params.get('monthrange')[0]
+            end_date = params.get('monthrange')[1]
+            filter_kwargs['order_time__range'] = (start_date + ' 00:00:00', end_date + ' 23:59:59')
 
-        total_count = objs.count()
+        queryset = BabyExpense.objects.filter(**filter_kwargs).order_by('-order_time')
+
+        # Calculate statistics BEFORE pagination
+        all_income = queryset.filter(expense_type='income').aggregate(Sum('amount'))['amount__sum'] or 0
+        all_expense = queryset.filter(expense_type='expense').aggregate(Sum('amount'))['amount__sum'] or 0
         
-        # Apply pagination
-        start_index = (page - 1) * page_size
-        end_index = page * page_size
-        objs = objs[start_index:end_index]
+        # Paginate
+        start = (page_num - 1) * page_size
+        end = start + page_size
+        page_data = queryset[start:end]
+        total = queryset.count()
 
-        serializer = BabyExpenseSerializer(objs, many=True)
+        serializer = BabyExpenseSerializer(page_data, many=True)
 
-        all_income = BabyExpense.objects.filter(user=user, expense_type='income').aggregate(amount=Sum('amount', default=0))
-        all_expense = BabyExpense.objects.filter(user=user, expense_type='expense').aggregate(amount=Sum('amount', default=0))
+        return Response({
+            'code': 200,
+            'data': {
+                'list': serializer.data,
+                'total': total,
+                'all_income': all_income,
+                'all_expense': all_expense,
+                'range_income': all_income,
+                'range_expense': all_expense
+            },
+            'msg': 'ok'
+        })
 
-        data = {
-            "expense_list": serializer.data, 
-            "total": total_count,
-            "range_income": range_income["amount"], 
-            "range_expense": range_expense["amount"],
-            "all_income": all_income["amount"], 
-            "all_expense": all_expense["amount"]
-        }
-        return Response({'code': 200, 'data': data, 'msg': 'ok'})
+
+class ExpenseTagView(APIView):
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        tags = ExpenseTag.objects.filter(user=user).values_list('name', flat=True)
+        return Response({'code': 200, 'data': list(tags), 'msg': 'ok'})
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        name = request.data.get("name")
+        if not name:
+            return Response({'code': 400, 'msg': 'name is required'})
+        
+        # Check duplicate
+        if ExpenseTag.objects.filter(user=user, name=name).exists():
+            return Response({'code': 400, 'msg': 'Tag already exists'})
+            
+        ExpenseTag.objects.create(user=user, name=name)
+        return Response({'code': 200, 'msg': 'ok'})

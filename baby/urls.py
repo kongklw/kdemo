@@ -40,6 +40,7 @@ urlpatterns = [
     path('expense', expense_views.ExpenseView.as_view()),
     path('batch_expense', expense_views.BatchExpenseView.as_view()),
     path('batch_delete_expense', expense_views.BatchDeleteExpenseView.as_view()),
+    path('expense_tags', expense_views.ExpenseTagView.as_view()),
 
     # sleep
     path('sleep_list', sleep_views.SleepListView.as_view()),
