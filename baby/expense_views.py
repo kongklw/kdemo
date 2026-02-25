@@ -213,7 +213,11 @@ class ExpenseListView(APIView):
         filter_kwargs = {'user': user}
 
         if params.get('name'):
-            filter_kwargs['name__contains'] = params.get('name')
+            filter_kwargs['name__icontains'] = params.get('name')
+        
+        # Filter by expense type (income/expense)
+        if params.get('expense_type') and params.get('expense_type') in ['income', 'expense']:
+            filter_kwargs['expense_type'] = params.get('expense_type')
 
         if params.get('monthrange'):
             start_date = params.get('monthrange')[0]
