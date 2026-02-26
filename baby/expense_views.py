@@ -44,9 +44,10 @@ class ExpenseView(APIView):
         amount = data.get("amount")
         tag = data.get("tag")
         expense_type = data.get("expense_type", "expense")
+        image_url = data.get("image_url")
 
         objs = BabyExpense(user=user, order_time=order_time, name=name, amount=amount, tag=tag,
-                           expense_type=expense_type)
+                           expense_type=expense_type, image_url=image_url)
         objs.save()
         return Response({'code': 200, 'data': None, 'msg': 'ok'})
 
@@ -67,6 +68,7 @@ class ExpenseView(APIView):
         obj.amount = data.get("amount", obj.amount)
         obj.tag = data.get("tag", obj.tag)
         obj.expense_type = data.get("expense_type", obj.expense_type)
+        obj.image_url = data.get("image_url", obj.image_url)
         obj.save()
         return Response({'code': 200, 'data': None, 'msg': 'ok'})
 
