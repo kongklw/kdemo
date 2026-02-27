@@ -39,6 +39,8 @@ RUN /usr/local/bin/python -m pip install --upgrade pip -i https://mirrors.aliyun
 # 安装项目依赖
 RUN pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
 
+RUN uwsgi --version
+
 # 移除\r in windows
 RUN sed -i 's/\r//' ./start.sh
 
