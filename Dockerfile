@@ -34,10 +34,10 @@ ADD . $APP_HOME
 # RUN tar -xvf frontend/dist.tar --strip-components 1 -C frontend
 # RUN unzip -o frontend/dist.zip -d frontend/
 # 更新pip版本
-RUN /usr/local/bin/python -m pip install --upgrade pip
+RUN /usr/local/bin/python -m pip install --upgrade pip -i https://mirrors.aliyun.com/pypi/simple/
 
 # 安装项目依赖
-RUN pip install -r requirements.txt
+RUN pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
 
 # 移除\r in windows
 RUN sed -i 's/\r//' ./start.sh
