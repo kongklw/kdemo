@@ -362,21 +362,37 @@ class BabyInfoView(APIView):
         user = request.user
         params = request.query_params
         name = params.get("name")
-        # 使用 filter 和 first 避免找不到或返回多个对象时报错，并加上 user 过滤
-        queryset = BabyInfo.objects.filter(user=user, name=name).first()
+        
+        if name:
+            queryset = BabyInfo.objects.filter(user=user, name=name).first()
+        else:
+            queryset = BabyInfo.objects.filter(user=user).first()
+            
         if not queryset:
-             return Response({"code": 404, "data": None, "msg": "Not found"})
+             return Response({"code": 200, "data": None, "msg": "No baby info found"})
         serializer = BabyInfoSerializer(queryset)
         response = {"code": 200, "data": serializer.data, "msg": "success"}
         return Response(response)
 
     def post(self, request, *args, **kwargs):
         data = request.data
-        serializer = BabyInfoSerializer(data=data)
+        user = request.user
+        
+        # Check if user already has baby info
+        # Assuming one baby per user for now based on "Me" page context
+        # If name is provided in data, we might want to match by name, 
+        # but for single baby scenario, just get the first one.
+        instance = BabyInfo.objects.filter(user=user).first()
+        
+        if instance:
+            serializer = BabyInfoSerializer(instance, data=data, partial=True)
+        else:
+            serializer = BabyInfoSerializer(data=data)
+            
         if serializer.is_valid():
             # 保存时关联当前用户
             serializer.save(user=request.user)
-            return Response({'code': 200, 'msg': 'ok', 'data': None})
+            return Response({'code': 200, 'msg': 'ok', 'data': serializer.data})
         return Response({'code': 400, 'msg': str(serializer.errors), 'data': None})
 
 
