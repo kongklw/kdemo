@@ -15,6 +15,10 @@ class BabyInfo(models.Model):
     birth_weight = models.IntegerField()
     birth_height = models.IntegerField()
     gender = models.CharField(max_length=10, choices=Gender, default=Gender.FEMALE)
+    birth_week = models.IntegerField(default=40)
+    is_sensitive = models.BooleanField(default=False)
+    is_only_child = models.BooleanField(default=False)
+    image = models.ImageField(upload_to='baby/', null=True, blank=True)
     created_at = models.DateField(auto_now_add=True)
     updated_at = models.DateField(auto_now=True)
 

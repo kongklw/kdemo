@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from datetime import date
 from .models import (BabyInfo, FeedMilk, SleepLog, BabyDiapers,
                      BabyExpense, Temperature, TodoList, PantsBrandModel, GrowingBlogModel
                      )
@@ -21,9 +22,17 @@ class GrowingBlogSerializer(serializers.ModelSerializer):
 
 
 class BabyInfoSerializer(serializers.ModelSerializer):
+    status = serializers.SerializerMethodField()
+
     class Meta:
         model = BabyInfo
-        fields = '__all__'
+        fields = ['id', 'user', 'name', 'birthday', 'birth_weight', 'birth_height', 'gender', 'image', 'status', 'birth_week', 'is_sensitive', 'is_only_child']
+        read_only_fields = ['user']
+
+    def get_status(self, obj):
+        if obj.birthday:
+            return '育儿中' if obj.birthday <= date.today() else '待产中'
+        return '备孕中'
 
 
 class TodoListSerializer(serializers.ModelSerializer):
