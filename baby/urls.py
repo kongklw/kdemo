@@ -1,7 +1,7 @@
 from django.urls import path, include
 from . import (views, temperature_views, baby_pants_view, todo_views,
                dashboard_views, sleep_views, expense_views, growing_blog_view,
-               breast_feed_views, baby_info_views)
+               breast_feed_views, baby_info_views, album_views)
 
 urlpatterns = [
 
@@ -37,4 +37,8 @@ urlpatterns = [
     # sleep
     path('sleep_list', sleep_views.SleepListView.as_view()),
     path('sleep', sleep_views.SleepView.as_view()),
+
+    # baby album
+    path('albums', album_views.BabyAlbumListCreateView.as_view()),
+    path('albums/<int:pk>', album_views.BabyAlbumDetailView.as_view()),
 ]

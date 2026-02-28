@@ -100,6 +100,29 @@ class BabyExpense(models.Model):
     update_time = models.DateField(blank=False, auto_now=True)
 
 
+class BabyAlbum(models.Model):
+    class Visibility(models.TextChoices):
+        PUBLIC = 'public', 'Public'
+        PRIVATE = 'private', 'Private'
+        RELATIVES = 'relatives', 'Relatives'
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    content = models.TextField(blank=True, null=True)
+    happened_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    visibility = models.CharField(max_length=20, choices=Visibility.choices, default=Visibility.RELATIVES)
+    tags = models.JSONField(default=list, blank=True)
+
+    class Meta:
+        ordering = ['-happened_at']
+
+
+class AlbumPhoto(models.Model):
+    album = models.ForeignKey(BabyAlbum, related_name='photos', on_delete=models.CASCADE)
+    image = models.ImageField(upload_to='baby_album/')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
 class ExpenseTag(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     name = models.CharField(max_length=50)
