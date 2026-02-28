@@ -167,3 +167,5 @@ class BrandPantsView(MyModelViewSet):
         obj.save()
 
         return Response(response={'code': 200, "data": None, "msg": "ok"})
+
+

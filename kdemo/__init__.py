@@ -1,8 +1,10 @@
 
-from langgraph.checkpoint.memory import MemorySaver
+try:
+    from langgraph.checkpoint.memory import MemorySaver
+    memory = MemorySaver()
+except ImportError:
+    memory = None
 
 from .celery import app as celery_app
-
-memory = MemorySaver()
 
 __all__ = ('celery_app',)

@@ -3,47 +3,61 @@ from rest_framework.response import Response
 from .models import BabyInfo
 from .serializers import BabyInfoSerializer
 import logging
-
+from rest_framework import serializers
+from rest_framework.permissions import IsAuthenticated
 logger = logging.getLogger(__name__)
 
+
 class BabyInfoView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def get(self, request, *args, **kwargs):
         try:
             user = request.user
-            # Get the first BabyInfo for the user, or create one if not exists?
-            # Better to return empty if not exists so frontend can prompt to create.
-            # But for simplicity, let's try to get or return empty.
-            obj = BabyInfo.objects.filter(user=user).first()
-            if obj:
-                serializer = BabyInfoSerializer(obj)
-                return Response({"code": 200, "data": serializer.data, "msg": "ok"})
-            else:
-                # Return empty data structure or specific code
-                return Response({"code": 200, "data": None, "msg": "no data"})
+            # params = request.query_params
+            # name = params.get("name")
+
+            queryset = BabyInfo.objects.filter(user=user).first()
+            
+            if not queryset:
+                return Response({"code": 200, "data": None, "msg": "No baby info found"})
+            serializer = BabyInfoSerializer(queryset)
+            response = {"code": 200, "data": serializer.data, "msg": "success"}
+            return Response(response)
         except Exception as e:
             logger.error(str(e))
             return Response({"code": 500, "data": None, "msg": str(e)})
 
     def post(self, request, *args, **kwargs):
+        print(f"DEBUG: BabyInfoView post hit. User: {request.user}, Data: {request.data}")
         try:
+            data = request.data
             user = request.user
-            data = request.data.copy() # Make mutable copy
-            
-            # Check if exists
-            obj = BabyInfo.objects.filter(user=user).first()
-            
-            data['user'] = user.id
-            
-            if obj:
-                serializer = BabyInfoSerializer(obj, data=data, partial=True)
+
+            # Check if user already has baby info
+            instance = BabyInfo.objects.filter(user=user).first()
+            print('是否有instance',instance)
+            if instance:
+                # Update existing record
+                serializer = BabyInfoSerializer(instance, data=data, partial=True)
             else:
+                # Create new record
+                print(1111111)
                 serializer = BabyInfoSerializer(data=data)
+                print(22222222222)
 
             if serializer.is_valid():
+                print(3333333)
+                # Save with user context
                 serializer.save(user=user)
-                return Response({"code": 200, "data": serializer.data, "msg": "ok"})
+                print(44444444)
+                return Response({'code': 200, 'msg': 'ok', 'data': serializer.data})
             else:
-                return Response({"code": 400, "data": None, "msg": str(serializer.errors)})
+                print(555555555555)
+                raise serializers.ValidationError(serializer.errors)
+
+            logger.error(f"BabyInfo validation error: {serializer.errors}")
+            return Response({'code': 400, 'msg': str(serializer.errors), 'data': None})
         except Exception as e:
-            logger.error(str(e))
+            logger.exception("BabyInfo unhandled exception")
             return Response({"code": 500, "data": None, "msg": str(e)})
