@@ -46,19 +46,37 @@ statusMap = {
     "dry": '干爽'}
 
 
+from rest_framework.pagination import PageNumberPagination
+
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
 class BabyPantsView(APIView):
     def get(self, request, *args, **kwargs):
         user = request.user
         params = request.query_params
         use_date = params.get("use_date")
-        queryset = BabyDiapers.objects.filter(user=user.id, use_date__date=use_date).order_by("-use_date")
-        babyPantsCount = len(queryset)
+        
+        queryset = BabyDiapers.objects.filter(user=user.id).order_by("-use_date")
+        
+        if use_date and use_date != 'null' and use_date != 'undefined':
+            queryset = queryset.filter(use_date__date=use_date)
+            
+        paginator = StandardResultsSetPagination()
+        page = paginator.paginate_queryset(queryset, request)
+        
+        if page is not None:
+            serializer = BabyDiapersSerializer(page, many=True)
+            result_data = serializer.data
+        else:
+            serializer = BabyDiapersSerializer(queryset, many=True)
+            result_data = serializer.data
 
-        serializer = BabyDiapersSerializer(queryset, many=True)
-        result_data = serializer.data
         status_list = []
 
-        for item in serializer.data:
+        for item in result_data:
             status = item.get("tabActiveName")
             item_dict = {"id": item.get("id"), "status": statusMap.get(status), "describe": item.get("describe"),
                          "use_date": item.get("use_date")}
@@ -73,10 +91,8 @@ class BabyPantsView(APIView):
                 pass
 
             status_list.append(item_dict)
-        if len(result_data) == 0:
-            return Response({"code": 200, "data": [], "msg": "fetch all success"})
-
-        return Response({"code": 200, "data": {"status_list": status_list, "babyPantsCount": babyPantsCount},
+            
+        return Response({"code": 200, "data": {"results": status_list, "count": queryset.count()},
                          "msg": "fetch all success"})
 
     def post(self, request, *args, **kwargs):

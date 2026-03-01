@@ -2,9 +2,14 @@ from rest_framework import serializers
 from datetime import date
 from .models import (BabyInfo, FeedMilk, SleepLog, BabyDiapers,
                      BabyExpense, Temperature, TodoList, PantsBrandModel, GrowingBlogModel,
-                     BabyAlbum, AlbumPhoto
+                     BabyAlbum, AlbumPhoto, DailyHabit
                      )
 
+class DailyHabitSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DailyHabit
+        fields = '__all__'
+        read_only_fields = ['user']
 
 class GrowingBlogSerializer(serializers.ModelSerializer):
     class Meta:
@@ -45,7 +50,7 @@ class TodoListSerializer(serializers.ModelSerializer):
 class TodoTableSerializer(serializers.ModelSerializer):
     class Meta:
         model = TodoList
-        fields = ['create_time', 'text', 'done']
+        fields = ['create_time', 'text', 'done', 'is_daily', 'icon']
 
 
 class FeedMilkSerializer(serializers.ModelSerializer):

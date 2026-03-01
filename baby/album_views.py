@@ -15,8 +15,8 @@ class BabyAlbumListCreateView(APIView):
 
     def get(self, request):
         # Simple list for now, pagination can be added later if needed
-        albums = BabyAlbum.objects.filter(user=request.user)
-        serializer = BabyAlbumSerializer(albums, many=True)
+        albums = BabyAlbum.objects.filter(user=request.user).order_by('-happened_at', '-created_at')
+        serializer = BabyAlbumSerializer(albums, many=True, context={'request': request})
         return Response({'code': 200, 'msg': 'ok', 'data': serializer.data})
 
     def post(self, request):

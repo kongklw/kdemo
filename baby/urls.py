@@ -15,6 +15,7 @@ urlpatterns = [
     # todo
     path('todo', todo_views.TodoListView.as_view()),
     path('todo_table', todo_views.TodoTableView.as_view()),
+    path('daily_habit', todo_views.DailyHabitView.as_view()),
 
     # feed
     path('feed', breast_feed_views.FeedMilkView.as_view()),
@@ -39,6 +40,6 @@ urlpatterns = [
     path('sleep', sleep_views.SleepView.as_view()),
 
     # baby album
-    path('albums', album_views.BabyAlbumListCreateView.as_view()),
-    path('albums/<int:pk>', album_views.BabyAlbumDetailView.as_view()),
+    path('albums/', album_views.BabyAlbumListCreateView.as_view()),
+    path('albums/<int:pk>/', album_views.BabyAlbumDetailView.as_view()),
 ]

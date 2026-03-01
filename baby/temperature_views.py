@@ -38,7 +38,7 @@ def get_temperature(user_id, date, mode):
             '-date')
 
     else:
-        objs = Temperature.object.filter(user=user_id, measure_date=date)
+        objs = Temperature.objects.filter(user=user_id, measure_date=date)
 
     serializer = TemperatureSerializer(objs, many=True)
     data = serializer.data
@@ -74,7 +74,7 @@ class TemperatureView(APIView):
             current_temperature = "未测"
 
         response = {'code': 200,
-                    'data': {"temperature_list": serializer.data, "current_temperature": current_temperature},
+                    'data': {"results": serializer.data, "temperature": current_temperature},
                     'msg': 'ok'}
         print(response)
 

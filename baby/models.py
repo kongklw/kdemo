@@ -149,9 +149,19 @@ class UserAppOrder(models.Model):
     def __str__(self):
         return f"{self.user.username}'s App Order"
 
+class DailyHabit(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    text = models.CharField(max_length=100)
+    icon = models.CharField(max_length=50, blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
 class TodoList(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     create_time = models.DateField(blank=False, auto_now_add=True)
     update_time = models.DateField(blank=False, auto_now=True)
     text = models.CharField(max_length=100, null=False)
     done = models.BooleanField(default=False)
+    is_daily = models.BooleanField(default=False)
+    icon = models.CharField(max_length=50, blank=True, null=True)
