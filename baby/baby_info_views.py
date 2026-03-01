@@ -21,7 +21,7 @@ class BabyInfoView(APIView):
             
             if not queryset:
                 return Response({"code": 200, "data": None, "msg": "No baby info found"})
-            serializer = BabyInfoSerializer(queryset)
+            serializer = BabyInfoSerializer(queryset, context={'request': request})
             response = {"code": 200, "data": serializer.data, "msg": "success"}
             return Response(response)
         except Exception as e:
@@ -39,11 +39,11 @@ class BabyInfoView(APIView):
             print('是否有instance',instance)
             if instance:
                 # Update existing record
-                serializer = BabyInfoSerializer(instance, data=data, partial=True)
+                serializer = BabyInfoSerializer(instance, data=data, partial=True, context={'request': request})
             else:
                 # Create new record
                 print(1111111)
-                serializer = BabyInfoSerializer(data=data)
+                serializer = BabyInfoSerializer(data=data, context={'request': request})
                 print(22222222222)
 
             if serializer.is_valid():
