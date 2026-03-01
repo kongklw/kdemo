@@ -47,6 +47,13 @@ class FeedMilk(models.Model):
     feed_time = models.DateTimeField(blank=False)
     milk_volume = models.IntegerField()
     time_different = models.DateTimeField(blank=True, null=True)
+    
+    # Extended fields for detailed records
+    feed_type = models.CharField(max_length=20, default='bottle') # breast, breast_bottle, formula
+    duration_total = models.IntegerField(default=0) # seconds
+    left_duration = models.IntegerField(default=0) # seconds
+    right_duration = models.IntegerField(default=0) # seconds
+    note = models.TextField(blank=True, null=True)
 
 
 class SleepLog(models.Model):
@@ -133,6 +140,14 @@ class ExpenseTag(models.Model):
         verbose_name = "expense_tag"
         verbose_name_plural = verbose_name
 
+
+class UserAppOrder(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='app_order')
+    order = models.JSONField(default=list)  # Stores list of app keys
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.username}'s App Order"
 
 class TodoList(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)

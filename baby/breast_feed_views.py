@@ -74,9 +74,46 @@ class FeedMilkView(APIView):
         user = request.user
         data = request.data
 
-        ser_data = {'feed_time': data.get("feed_time"), 'milk_volume': int(data.get("milk_volume")), 'user': user.id}
+        ser_data = {
+            'feed_time': data.get("feed_time"),
+            'milk_volume': int(data.get("milk_volume") or 0),
+            'user': user.id,
+            'feed_type': data.get("feed_type", "bottle"),
+            'duration_total': int(data.get("duration_total") or 0),
+            'left_duration': int(data.get("left_duration") or 0),
+            'right_duration': int(data.get("right_duration") or 0),
+            'note': data.get("note", "")
+        }
 
         serializer = FeedMilkSerializer(data=ser_data)
+        if serializer.is_valid():
+            serializer.save()
+        else:
+            return Response({'code': 205, 'msg': str(serializer.errors), 'data': None})
+        return Response({'code': 200, 'msg': 'ok', 'data': None})
+
+    def put(self, request, *args, **kwargs):
+        user = request.user
+        data = request.data
+        feed_id = data.get("id")
+        
+        try:
+            feed_obj = FeedMilk.objects.get(id=feed_id, user=user)
+        except FeedMilk.DoesNotExist:
+            return Response({'code': 404, 'msg': 'Record not found', 'data': None})
+
+        ser_data = {
+            'feed_time': data.get("feed_time"),
+            'milk_volume': int(data.get("milk_volume") or 0),
+            'user': user.id,
+            'feed_type': data.get("feed_type", "bottle"),
+            'duration_total': int(data.get("duration_total") or 0),
+            'left_duration': int(data.get("left_duration") or 0),
+            'right_duration': int(data.get("right_duration") or 0),
+            'note': data.get("note", "")
+        }
+
+        serializer = FeedMilkSerializer(feed_obj, data=ser_data)
         if serializer.is_valid():
             serializer.save()
         else:

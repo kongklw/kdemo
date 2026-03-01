@@ -65,10 +65,10 @@ class BabyPantsView(APIView):
             if status == "peeing":
                 item_dict["peeing"] = item.get("peeing_color")
             elif status == "stool":
-                item_dict["stool"] = item.get("stool_color") + item.get("stool_shape")
+                item_dict["stool"] = str(item.get("stool_color") or "") + str(item.get("stool_shape") or "")
             elif status == "peeing-stool":
                 item_dict["peeing"] = item.get("peeing_color")
-                item_dict["stool"] = item.get("stool_color") + item.get("stool_shape")
+                item_dict["stool"] = str(item.get("stool_color") or "") + str(item.get("stool_shape") or "")
             else:
                 pass
 
@@ -103,7 +103,10 @@ class BabyPantsView(APIView):
             peeing_color = data.get("peeing_color")
             stool_color = data.get("stool_color")
             stool_shape_list = data.get("stool_shape_list")
-            stool_shape = "#".join(stool_shape_list)
+            if stool_shape_list:
+                stool_shape = "#".join(stool_shape_list)
+            else:
+                stool_shape = ""
             brand = data.get("brand")
             is_leaked = data.get("is_leaked")
             describe = data.get("describe")
@@ -148,13 +151,11 @@ class BrandPantsView(MyModelViewSet):
     def get(self, request, *args, **kwargs):
 
         user = request.user
-        objs = PantsBrandModel.objects.all(user=user.id)
-        serializer = PantsBrandSerializer(data=objs, many=True)
-        if serializer.is_valid():
-            data = serializer.data
-            response = {'code': 200, "data": data, "msg": "ok"}
-        else:
-            response = {'code': 200, "data": None, "msg": str(serializer.errors)}
+        objs = PantsBrandModel.objects.filter(user=user.id)
+        serializer = PantsBrandSerializer(objs, many=True)
+        # Serializer with instance argument doesn't need is_valid()
+        data = serializer.data
+        response = {'code': 200, "data": data, "msg": "ok"}
 
         return Response(response)
 

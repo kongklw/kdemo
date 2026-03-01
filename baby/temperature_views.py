@@ -53,16 +53,24 @@ class TemperatureView(APIView):
         params = request.query_params
         start_date = params.get("start_date")
         end_date = params.get("end_date")
+        
+        if not start_date or not end_date:
+            # Default to last 7 days if not provided
+            today = date.today()
+            end_date = today
+            start_date = today - timedelta(days=7)
+            
         user_id = user.id
         objs = Temperature.objects.filter(user=user_id, measure_date__gte=start_date,
                                           measure_date__lte=end_date).order_by('-measure_date')
         serializer = TemperatureSerializer(objs, many=True)
 
         current_day = date.today()
-        try:
-            obj = Temperature.objects.get(user=user.id, measure_date=current_day)
-            current_temperature = obj.temperature
-        except:
+        # Fix: Handle multiple objects or no objects gracefully
+        current_temp_obj = Temperature.objects.filter(user=user.id, measure_date=current_day).order_by('-id').first()
+        if current_temp_obj:
+            current_temperature = current_temp_obj.temperature
+        else:
             current_temperature = "未测"
 
         response = {'code': 200,
@@ -79,7 +87,10 @@ class TemperatureView(APIView):
             print(data)
 
             measure_date = data.get("measure_date")
-            temperature = data.get("temperature")
+            try:
+                temperature = float(data.get("temperature"))
+            except (ValueError, TypeError):
+                return Response({'code': 400, 'msg': 'Invalid temperature value', 'data': None})
 
             if temperature <= 36.0:
                 status = "低温"
