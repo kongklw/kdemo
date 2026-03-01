@@ -1,5 +1,5 @@
 # 建立 python 3.9环境
-FROM m.daocloud.io/docker.io/library/python:3.12-slim
+FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/python:3.12-slim
 
 # 替换软件源为阿里云
 RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources
