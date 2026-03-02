@@ -12,6 +12,7 @@
 #done
 
 echo "start uwsgi-----------------"
+mkdir -p /home/kdemo/logs
 uwsgi --ini /home/kdemo/uwsgi.ini
 echo "end uwsgi-----------------"
 tail -f /dev/null

@@ -76,7 +76,6 @@ class TemperatureView(APIView):
         response = {'code': 200,
                     'data': {"results": serializer.data, "temperature": current_temperature},
                     'msg': 'ok'}
-        print(response)
 
         return Response(response)
 
@@ -84,7 +83,6 @@ class TemperatureView(APIView):
         try:
             user = request.user
             data = request.data
-            print(data)
 
             measure_date = data.get("measure_date")
             try:

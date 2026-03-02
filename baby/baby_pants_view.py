@@ -112,7 +112,6 @@ class BabyPantsView(APIView):
             """
             user = request.user
             data = request.data
-            print(data)
 
             use_date = data.get("use_date")
             tabActiveName = data.get("tabActiveName")
@@ -150,7 +149,7 @@ class BabyPantsView(APIView):
             return Response({'code': 200, 'msg': 'ok', 'data': None})
 
         except Exception as exc:
-
+            logger.exception("BabyPants create error")
             return Response({'code': 205, 'msg': str(exc), 'data': None})
 
     def delete(self, request, *args, **kwargs):

@@ -163,7 +163,7 @@ class BatchExpenseView(APIView):
                 task_list.append(task)
 
         for item in task_list:
-            print(f"Both tasks have completed now: {item.result()}")
+            logger.debug("Expense image task done: %s", item.result())
 
     def post(self, request, *args, **kwargs):
         start = time.time()
@@ -182,9 +182,9 @@ class BatchExpenseView(APIView):
                     data = future.result()
 
                 except Exception as exc:
-                    print('%r generated an exception: %s' % (url, exc))
+                    logger.exception("Expense image task error: %s", url)
                 else:
-                    print('%r page is %d bytes' % (url, len(data)))
+                    logger.debug("Expense image task ok: %s", url)
 
         # task_list = []
         # async with asyncio.TaskGroup() as tg:
@@ -199,7 +199,7 @@ class BatchExpenseView(APIView):
         # asyncio.run(self.process(request))
 
         end = time.time()
-        print('total wast time are :', end - start)
+        logger.info("ExpenseView post total time: %.3fs", end - start)
         return Response({'code': 200, 'data': 'haha success', 'msg': 'ok'})
 
 

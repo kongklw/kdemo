@@ -62,5 +62,4 @@ class DashBoardView(APIView):
         # 喂奶数据
         chartData = process_feed_chart(user.id)
         response = {'code': 200, 'data': {"basicInfo": basicInfo, "charData": chartData}, 'msg': 'ok'}
-        print(response)
         return Response(response)

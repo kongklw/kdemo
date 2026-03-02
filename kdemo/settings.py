@@ -267,43 +267,93 @@ MEDIA_URL = "/media/"
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+LOG_DIR = env('LOG_DIR', default=os.path.join(BASE_DIR, 'logs'))
+LOG_LEVEL = env('LOG_LEVEL', default='INFO')
+LOG_TO_CONSOLE = env.bool('LOG_TO_CONSOLE', default=True)
+LOG_TO_FILE = env.bool('LOG_TO_FILE', default=True)
+LOG_RETENTION_DAYS = env.int('LOG_RETENTION_DAYS', default=30)
+
+os.makedirs(LOG_DIR, exist_ok=True)
+
 LOGGING = {
     'version': 1,
-    'disable_existing_loggers': False,  # 是否禁用已经存在的日志器
-    'formatters': {  # 日志信息显示的格式
-        'verbose': {
-            'format': '%(levelname)s %(asctime)s %(module)s %(lineno)d %(message)s'
-        },
-        'simple': {
-            'format': '%(levelname)s %(module)s %(lineno)d %(message)s'
-        },
+    'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format': '%(levelname)s %(asctime)s %(name)s %(process)d %(thread)d %(pathname)s:%(lineno)d %(message)s'
+        }
     },
-    'filters': {  # 对日志进行过滤
-        'require_debug_true': {  # django在debug模式下才输出日志
-            '()': 'django.utils.log.RequireDebugTrue',
-        },
-    },
-    'handlers': {  # 日志处理方法
-        'console': {  # 向终端中输出日志
-            'level': 'INFO',
-            'filters': ['require_debug_true'],
+    'handlers': {
+        'console': {
+            'level': LOG_LEVEL,
             'class': 'logging.StreamHandler',
-            'formatter': 'simple'
+            'formatter': 'standard'
         },
-        'file': {  # 向文件中输出日志
-            'level': 'INFO',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': os.path.join(BASE_DIR, 'logs', 'kdemo.log'),  # 日志文件的位置
-            'maxBytes': 300 * 1024 * 1024,
-            'backupCount': 10,
-            'formatter': 'verbose'
+        'file': {
+            'level': LOG_LEVEL,
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOG_DIR, 'kdemo.log'),
+            'when': 'midnight',
+            'interval': 1,
+            'backupCount': LOG_RETENTION_DAYS,
+            'encoding': 'utf-8',
+            'delay': True,
+            'formatter': 'standard'
         },
+        'file_error': {
+            'level': 'ERROR',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOG_DIR, 'kdemo.error.log'),
+            'when': 'midnight',
+            'interval': 1,
+            'backupCount': max(LOG_RETENTION_DAYS, 90),
+            'encoding': 'utf-8',
+            'delay': True,
+            'formatter': 'standard'
+        }
     },
-    'loggers': {  # 日志器
-        'django': {  # 定义了一个名为django的日志器
-            'handlers': ['console', 'file'],  # 可以同时向终端与文件中输出日志
-            'propagate': True,  # 是否继续传递日志信息
-            'level': 'INFO',  # 日志器接收的最低日志级别
+    'loggers': {
+        'django': {
+            'handlers': [],
+            'level': LOG_LEVEL,
+            'propagate': True
         },
+        'django.request': {
+            'handlers': [],
+            'level': 'ERROR',
+            'propagate': False
+        },
+        'django.server': {
+            'handlers': [],
+            'level': LOG_LEVEL,
+            'propagate': False
+        },
+        'django.db.backends': {
+            'handlers': [],
+            'level': env('DJANGO_DB_LOG_LEVEL', default='WARNING'),
+            'propagate': False
+        },
+        'django.utils.autoreload': {
+            'handlers': [],
+            'level': 'WARNING',
+            'propagate': False
+        }
+    },
+    'root': {
+        'handlers': [],
+        'level': LOG_LEVEL
     }
 }
+
+_root_handlers = []
+if LOG_TO_CONSOLE:
+    _root_handlers.append('console')
+if LOG_TO_FILE:
+    _root_handlers.extend(['file', 'file_error'])
+
+LOGGING['root']['handlers'] = _root_handlers
+LOGGING['loggers']['django']['handlers'] = _root_handlers
+LOGGING['loggers']['django.request']['handlers'] = _root_handlers
+LOGGING['loggers']['django.server']['handlers'] = _root_handlers
+LOGGING['loggers']['django.db.backends']['handlers'] = _root_handlers
+LOGGING['loggers']['django.utils.autoreload']['handlers'] = _root_handlers

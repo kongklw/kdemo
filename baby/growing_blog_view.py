@@ -51,19 +51,17 @@ class GrowingBlogView(APIView):
 
     def post(self, request, *args, **kwargs):
         try:
-            print(request.data)
-
             serializer = GrowingBlogSerializer(data=request.data, context={"request": request})
             if serializer.is_valid():
                 serializer.save()
             else:
-                print(serializer.errors)
+                logger.warning("GrowingBlog validation error: %s", serializer.errors)
                 return Response({'code': 205, 'msg': str(serializer.errors), 'data': None})
 
             return Response({'code': 200, 'msg': 'ok', 'data': None})
 
         except Exception as exc:
-
+            logger.exception("GrowingBlog create error")
             return Response({'code': 205, 'msg': str(exc), 'data': None})
 
     def delete(self, request, *args, **kwargs):

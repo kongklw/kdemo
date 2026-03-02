@@ -71,7 +71,7 @@ class LineChartView(APIView):
         user = request.user
         user_id = user.id
         params = request.query_params
-        print(params)
+        logger.debug("LineChart params: %s", dict(params))
         # date = params.get("date")
         date_time = datetime.now().strftime('%Y-%m-%d 00:00:00')
         date = datetime.now().date()
