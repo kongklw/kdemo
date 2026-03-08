@@ -52,7 +52,14 @@ class BabyAlbumListCreateView(APIView):
                     images = request.FILES.getlist('file')
 
                 for image in images:
-                    AlbumPhoto.objects.create(album=album, image=image)
+                    is_video = False
+                    # Check if file is video by content_type or extension
+                    if hasattr(image, 'content_type') and image.content_type.startswith('video/'):
+                        is_video = True
+                    elif hasattr(image, 'name') and image.name.lower().endswith(('.mp4', '.mov', '.avi', '.wmv', '.flv', '.mkv', '.webm')):
+                        is_video = True
+                        
+                    AlbumPhoto.objects.create(album=album, image=image, is_video=is_video)
                 
                 # Refresh to include photos in response
                 return Response({'code': 200, 'msg': 'ok', 'data': BabyAlbumSerializer(album).data})

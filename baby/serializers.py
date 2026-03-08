@@ -92,7 +92,7 @@ class BabyExpenseSerializer(serializers.ModelSerializer):
 class AlbumPhotoSerializer(serializers.ModelSerializer):
     class Meta:
         model = AlbumPhoto
-        fields = ['id', 'image', 'created_at']
+        fields = ['id', 'image', 'is_video', 'created_at']
 
 
 class BabyAlbumSerializer(serializers.ModelSerializer):

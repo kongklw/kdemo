@@ -126,7 +126,8 @@ class BabyAlbum(models.Model):
 
 class AlbumPhoto(models.Model):
     album = models.ForeignKey(BabyAlbum, related_name='photos', on_delete=models.CASCADE)
-    image = models.ImageField(upload_to='baby_album/')
+    image = models.FileField(upload_to='baby_album/')
+    is_video = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
 
@@ -165,3 +166,22 @@ class TodoList(models.Model):
     done = models.BooleanField(default=False)
     is_daily = models.BooleanField(default=False)
     icon = models.CharField(max_length=50, blank=True, null=True)
+
+
+class BabytreeWeeklyInfo(models.Model):
+    source = models.CharField(max_length=50, default='babytree')
+    stage = models.CharField(max_length=20, default='baby')
+    week_index = models.IntegerField(null=True, blank=True)
+    age_range_text = models.CharField(max_length=100, blank=True, null=True)
+    date_range_text = models.CharField(max_length=100, blank=True, null=True)
+    this_week_title = models.CharField(max_length=200, blank=True, null=True)
+    this_week_content = models.TextField(blank=True, null=True)
+    baby_change_text = models.TextField(blank=True, null=True)
+    baby_change_question = models.TextField(blank=True, null=True)
+    growth_quicklook = models.JSONField(default=dict, blank=True)
+    source_url = models.CharField(max_length=500, blank=True, null=True)
+    raw_payload = models.JSONField(default=dict, blank=True)
+    fetched_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('source', 'stage', 'week_index', 'age_range_text')
