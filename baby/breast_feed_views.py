@@ -17,11 +17,7 @@ from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from django.db.models import Sum
 from zoneinfo import ZoneInfo
 from decimal import Decimal, getcontext
-from utils import alibaba_client
-from utils.chatApp import obtain_app
 from kdemo.settings import MEDIA_ROOT
-from langchain_core.messages import HumanMessage
-import concurrent.futures
 
 logger = logging.getLogger(__name__)
 

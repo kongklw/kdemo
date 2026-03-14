@@ -130,6 +130,67 @@ class AlbumPhoto(models.Model):
     is_video = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
+class GrowthRecord(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    measure_date = models.DateField()
+    height_cm = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
+    weight_kg = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    head_circumference_cm = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
+    photo = models.ImageField(upload_to='growth/', null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-measure_date', '-id']
+
+
+class VaccineDefinition(models.Model):
+    class FeeType(models.TextChoices):
+        FREE = 'free', 'FREE'
+        PAID = 'paid', 'PAID'
+
+    vaccine_key = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=200)
+    dose_index = models.IntegerField(default=1)
+    dose_total = models.IntegerField(default=1)
+    fee_type = models.CharField(max_length=10, choices=FeeType.choices, default=FeeType.FREE)
+    description = models.CharField(max_length=500, blank=True, null=True)
+    months_offset = models.DecimalField(max_digits=4, decimal_places=1, default=0)
+    days_offset = models.IntegerField(default=0)
+    price_min = models.IntegerField(blank=True, null=True)
+    price_max = models.IntegerField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['months_offset', 'days_offset', 'id']
+
+
+class BabyVaccineRecord(models.Model):
+    class FeeType(models.TextChoices):
+        FREE = 'free', 'FREE'
+        PAID = 'paid', 'PAID'
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    vaccine_key = models.CharField(max_length=100)
+    name = models.CharField(max_length=200)
+    dose_index = models.IntegerField(default=1)
+    dose_total = models.IntegerField(default=1)
+    fee_type = models.CharField(max_length=10, choices=FeeType.choices, default=FeeType.FREE)
+    description = models.CharField(max_length=500, blank=True, null=True)
+    recommend_date = models.DateField()
+    done = models.BooleanField(default=False)
+    actual_date = models.DateField(blank=True, null=True)
+    price_min = models.IntegerField(blank=True, null=True)
+    price_max = models.IntegerField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('user', 'vaccine_key', 'recommend_date')
+        ordering = ['recommend_date', 'id']
+
 
 class ExpenseTag(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)

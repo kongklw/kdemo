@@ -4,7 +4,6 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from utils import alibaba_client, client
 from django.core.cache import cache
-from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, BaseMessage, trim_messages
 from django_redis import get_redis_connection
 from utils.chatApp import obtain_app
 

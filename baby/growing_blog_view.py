@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from .models import GrowingBlogModel
 from .serializers import GrowingBlogSerializer
-from utils.chatApp import obtain_app, model
+from utils.chatApp import obtain_app
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,5 @@
 from datetime import datetime
 from kdemo import settings
-from openai import OpenAI
 
 
 def convert_string_datetime(string):
@@ -19,12 +18,23 @@ def convert_seconds(seconds):
     return "{}h {}m".format(hours, min)
 
 
-client = OpenAI(
-    api_key=settings.OPENAI_API_KEY
-)
+class LazyOpenAIClient:
+    def __init__(self, **kwargs):
+        self._kwargs = kwargs
+        self._client = None
 
-alibaba_client = OpenAI(
-    # 若没有配置环境变量，请用百炼API Key将下行替换为：api_key="sk-xxx",
+    def _get(self):
+        if self._client is None:
+            from openai import OpenAI
+            self._client = OpenAI(**self._kwargs)
+        return self._client
+
+    def __getattr__(self, item):
+        return getattr(self._get(), item)
+
+
+client = LazyOpenAIClient(api_key=settings.OPENAI_API_KEY)
+alibaba_client = LazyOpenAIClient(
     api_key=settings.DASHSCOPE_API_KEY,
     base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
 )

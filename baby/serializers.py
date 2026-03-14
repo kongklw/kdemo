@@ -2,7 +2,7 @@ from rest_framework import serializers
 from datetime import date
 from .models import (BabyInfo, FeedMilk, SleepLog, BabyDiapers,
                      BabyExpense, Temperature, TodoList, PantsBrandModel, GrowingBlogModel,
-                     BabyAlbum, AlbumPhoto, DailyHabit
+                     BabyAlbum, AlbumPhoto, DailyHabit, GrowthRecord
                      )
 
 class DailyHabitSerializer(serializers.ModelSerializer):
@@ -87,6 +87,76 @@ class BabyExpenseSerializer(serializers.ModelSerializer):
     class Meta:
         model = BabyExpense
         fields = '__all__'
+
+def _calc_age_str(birthday, target_date):
+    if not birthday or not target_date:
+        return ""
+
+    if target_date < birthday:
+        return "出生前"
+
+    def _days_in_month(y, m):
+        if m == 12:
+            return (date(y + 1, 1, 1) - date(y, 12, 1)).days
+        return (date(y, m + 1, 1) - date(y, m, 1)).days
+
+    years = 0
+    while True:
+        next_year = birthday.year + years + 1
+        next_day = min(birthday.day, _days_in_month(next_year, birthday.month))
+        next_date = date(next_year, birthday.month, next_day)
+        if next_date > target_date:
+            break
+        years += 1
+
+    months = 0
+    while True:
+        total_months = months + 1
+        target_year = birthday.year + years
+        target_month = birthday.month + total_months
+
+        target_year += (target_month - 1) // 12
+        target_month = ((target_month - 1) % 12) + 1
+
+        target_day = min(birthday.day, _days_in_month(target_year, target_month))
+        next_date = date(target_year, target_month, target_day)
+        if next_date > target_date:
+            break
+        months += 1
+
+    anchor_year = birthday.year + years
+    anchor_month = birthday.month + months
+    anchor_year += (anchor_month - 1) // 12
+    anchor_month = ((anchor_month - 1) % 12) + 1
+    anchor_day = min(birthday.day, _days_in_month(anchor_year, anchor_month))
+    anchor = date(anchor_year, anchor_month, anchor_day)
+
+    days = (target_date - anchor).days
+
+    parts = []
+    if years > 0:
+        parts.append(f"{years}岁")
+    if months > 0:
+        parts.append(f"{months}个月")
+    if days > 0:
+        parts.append(f"{days}天")
+    if not parts:
+        return "出生当天"
+    return "".join(parts)
+
+class GrowthRecordSerializer(serializers.ModelSerializer):
+    age_description = serializers.SerializerMethodField()
+
+    class Meta:
+        model = GrowthRecord
+        fields = ['id', 'user', 'measure_date', 'height_cm', 'weight_kg', 'head_circumference_cm', 'photo', 'created_at', 'updated_at', 'age_description']
+        read_only_fields = ['user', 'created_at', 'updated_at']
+
+    def get_age_description(self, obj):
+        baby_info = BabyInfo.objects.filter(user=obj.user).first()
+        if not baby_info or not baby_info.birthday:
+            return ""
+        return _calc_age_str(baby_info.birthday, obj.measure_date)
 
 
 class AlbumPhotoSerializer(serializers.ModelSerializer):

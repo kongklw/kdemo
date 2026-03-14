@@ -14,10 +14,38 @@ class BabyAlbumListCreateView(APIView):
     parser_classes = [MultiPartParser, FormParser]
 
     def get(self, request):
-        # Simple list for now, pagination can be added later if needed
-        albums = BabyAlbum.objects.filter(user=request.user).order_by('-happened_at', '-created_at')
-        serializer = BabyAlbumSerializer(albums, many=True, context={'request': request})
-        return Response({'code': 200, 'msg': 'ok', 'data': serializer.data})
+        try:
+            page_size = int(request.query_params.get('page_size', 20))
+        except (TypeError, ValueError):
+            page_size = 20
+        try:
+            page_num = int(request.query_params.get('page_num', 1))
+        except (TypeError, ValueError):
+            page_num = 1
+
+        if page_size <= 0:
+            page_size = 20
+        if page_num <= 0:
+            page_num = 1
+
+        queryset = BabyAlbum.objects.filter(user=request.user).order_by('-happened_at', '-created_at')
+        total = queryset.count()
+
+        start = (page_num - 1) * page_size
+        end = start + page_size
+        page_data = queryset[start:end]
+
+        serializer = BabyAlbumSerializer(page_data, many=True, context={'request': request})
+        return Response({
+            'code': 200,
+            'msg': 'ok',
+            'data': {
+                'list': serializer.data,
+                'total': total,
+                'page_num': page_num,
+                'page_size': page_size
+            }
+        })
 
     def post(self, request):
         try:
