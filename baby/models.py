@@ -246,3 +246,42 @@ class BabytreeWeeklyInfo(models.Model):
 
     class Meta:
         unique_together = ('source', 'stage', 'week_index', 'age_range_text')
+
+
+class MenstrualSetting(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    cycle_length = models.IntegerField(default=28)
+    period_length = models.IntegerField(default=5)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class MenstrualLog(models.Model):
+    class Mood(models.TextChoices):
+        HAPPY = 'happy', 'happy'
+        GOOD = 'good', 'good'
+        NORMAL = 'normal', 'normal'
+        BAD = 'bad', 'bad'
+        WORSE = 'worse', 'worse'
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    date = models.DateField()
+    is_period = models.BooleanField(default=False)
+    flow_level = models.IntegerField(default=0)
+    pain_level = models.IntegerField(default=0)
+    had_sex = models.BooleanField(default=False)
+    symptoms = models.CharField(max_length=500, blank=True, null=True)
+    basal_temp = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+    weight_kg = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    mood = models.CharField(max_length=20, choices=Mood.choices, blank=True, null=True)
+    habit_eat_on_time = models.BooleanField(default=False)
+    habit_water8 = models.BooleanField(default=False)
+    habit_fruits = models.BooleanField(default=False)
+    habit_exercise = models.BooleanField(default=False)
+    habit_poop = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('user', 'date')
+        ordering = ['-date', '-id']

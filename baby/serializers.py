@@ -2,7 +2,7 @@ from rest_framework import serializers
 from datetime import date
 from .models import (BabyInfo, FeedMilk, SleepLog, BabyDiapers,
                      BabyExpense, Temperature, TodoList, PantsBrandModel, GrowingBlogModel,
-                     BabyAlbum, AlbumPhoto, DailyHabit, GrowthRecord
+                     BabyAlbum, AlbumPhoto, DailyHabit, GrowthRecord, MenstrualSetting, MenstrualLog
                      )
 
 class DailyHabitSerializer(serializers.ModelSerializer):
@@ -39,6 +39,20 @@ class BabyInfoSerializer(serializers.ModelSerializer):
         if obj.birthday:
             return '育儿中' if obj.birthday <= date.today() else '待产中'
         return '备孕中'
+
+
+class MenstrualSettingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MenstrualSetting
+        fields = '__all__'
+        read_only_fields = ['user']
+
+
+class MenstrualLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MenstrualLog
+        fields = '__all__'
+        read_only_fields = ['user']
 
 
 class TodoListSerializer(serializers.ModelSerializer):
