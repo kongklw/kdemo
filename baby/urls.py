@@ -56,4 +56,6 @@ urlpatterns = [
     path('period/overview', period_views.PeriodOverviewView.as_view()),
     path('period/log', period_views.PeriodLogView.as_view()),
     path('period/settings', period_views.PeriodSettingsView.as_view()),
+
+    path('birthday', views.BirthdayView.as_view()),
 ]

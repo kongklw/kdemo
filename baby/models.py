@@ -285,3 +285,27 @@ class MenstrualLog(models.Model):
     class Meta:
         unique_together = ('user', 'date')
         ordering = ['-date', '-id']
+
+
+class BirthdayRecord(models.Model):
+    class CalendarType(models.TextChoices):
+        LUNAR = 'lunar', 'lunar'
+        SOLAR = 'solar', 'solar'
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    name = models.CharField(max_length=100)
+    relation = models.CharField(max_length=50, blank=True, null=True)
+    calendar_type = models.CharField(max_length=10, choices=CalendarType.choices, default=CalendarType.LUNAR)
+
+    solar_date = models.DateField(blank=True, null=True)
+
+    lunar_year = models.IntegerField(blank=True, null=True)
+    lunar_month = models.IntegerField(blank=True, null=True)
+    lunar_day = models.IntegerField(blank=True, null=True)
+    lunar_is_leap = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at', '-id']

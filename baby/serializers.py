@@ -2,7 +2,7 @@ from rest_framework import serializers
 from datetime import date
 from .models import (BabyInfo, FeedMilk, SleepLog, BabyDiapers,
                      BabyExpense, Temperature, TodoList, PantsBrandModel, GrowingBlogModel,
-                     BabyAlbum, AlbumPhoto, DailyHabit, GrowthRecord, MenstrualSetting, MenstrualLog
+                     BabyAlbum, AlbumPhoto, DailyHabit, GrowthRecord, MenstrualSetting, MenstrualLog, BirthdayRecord
                      )
 
 class DailyHabitSerializer(serializers.ModelSerializer):
@@ -231,3 +231,10 @@ class BabyAlbumSerializer(serializers.ModelSerializer):
              return "出生当天"
         
         return "".join(parts)
+
+
+class BirthdayRecordSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BirthdayRecord
+        fields = '__all__'
+        read_only_fields = ['user', 'created_at', 'updated_at']
