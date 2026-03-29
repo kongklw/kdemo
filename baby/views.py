@@ -107,6 +107,118 @@ def _lunar_to_solar(y: int, m: int, d: int, is_leap: bool) -> date | None:
     return _LUNAR_START + timedelta(days=offset)
 
 
+def _solar_to_lunar(solar: date) -> dict | None:
+    if solar < _LUNAR_START:
+        return None
+    if solar.year < 1900 or solar.year > 2100:
+        return None
+
+    offset = (solar - _LUNAR_START).days
+    y = 1900
+    while y <= 2100:
+        y_days = _lunar_year_days(y)
+        if offset < y_days:
+            break
+        offset -= y_days
+        y += 1
+    if y > 2100:
+        return None
+
+    leap_month = _lunar_leap_month(y)
+    is_leap = False
+    m = 1
+    while m <= 12:
+        if leap_month and m == leap_month + 1 and not is_leap:
+            is_leap = True
+            mdays = _lunar_leap_days(y)
+            m -= 1
+        else:
+            mdays = _lunar_month_days(y, m)
+
+        if offset < mdays:
+            break
+        offset -= mdays
+
+        if is_leap and m == leap_month:
+            is_leap = False
+        m += 1
+
+    d = offset + 1
+    return {'lunar_year': y, 'lunar_month': m, 'lunar_day': int(d), 'lunar_is_leap': bool(is_leap)}
+
+
+def _pad2(v: int | None) -> str:
+    if v is None:
+        return ''
+    return str(int(v)).zfill(2)
+
+
+def _format_lunar_iso(y: int | None, m: int | None, d: int | None) -> str | None:
+    if not y or not m or not d:
+        return None
+    return f'{int(y)}-{_pad2(int(m))}-{_pad2(int(d))}'
+
+
+def _calc_age_ym(birth: date | None, today: date) -> str | None:
+    if not birth:
+        return None
+    if today < birth:
+        return None
+
+    years = today.year - birth.year
+    months = today.month - birth.month
+    if today.day < birth.day:
+        months -= 1
+    if months < 0:
+        years -= 1
+        months += 12
+    years = max(0, years)
+    months = max(0, months)
+    if years == 0 and months == 0:
+        return '0个月'
+    if years == 0:
+        return f'{months}个月'
+    if months == 0:
+        return f'{years}岁'
+    return f'{years}岁{months}个月'
+
+
+def _calc_constellation(birth: date | None) -> str | None:
+    if not birth:
+        return None
+    m = birth.month
+    d = birth.day
+    ranges = [
+        (1, 20, '水瓶座'), (2, 19, '双鱼座'), (3, 21, '白羊座'), (4, 20, '金牛座'),
+        (5, 21, '双子座'), (6, 22, '巨蟹座'), (7, 23, '狮子座'), (8, 23, '处女座'),
+        (9, 23, '天秤座'), (10, 24, '天蝎座'), (11, 23, '射手座'), (12, 22, '摩羯座'),
+    ]
+    for month, start_day, name in ranges:
+        if (m == month and d >= start_day) or (m == month + 1 and d < start_day):
+            return name
+    if (m == 12 and d >= 22) or (m == 1 and d < 20):
+        return '摩羯座'
+    return None
+
+
+def _ensure_birthday_both_calendars(record: BirthdayRecord) -> None:
+    if record.solar_date and not (record.lunar_year and record.lunar_month and record.lunar_day):
+        lunar = _solar_to_lunar(record.solar_date)
+        if lunar:
+            record.lunar_year = lunar['lunar_year']
+            record.lunar_month = lunar['lunar_month']
+            record.lunar_day = lunar['lunar_day']
+            record.lunar_is_leap = lunar['lunar_is_leap']
+            record.save(update_fields=['lunar_year', 'lunar_month', 'lunar_day', 'lunar_is_leap', 'updated_at'])
+        return
+
+    if record.lunar_year and record.lunar_month and record.lunar_day and not record.solar_date:
+        solar = _lunar_to_solar(int(record.lunar_year), int(record.lunar_month), int(record.lunar_day), bool(record.lunar_is_leap))
+        if solar:
+            record.solar_date = solar
+            record.save(update_fields=['solar_date', 'updated_at'])
+
+
 def _calc_next_birthday_date(record: BirthdayRecord, today: date) -> date | None:
     if record.calendar_type == BirthdayRecord.CalendarType.SOLAR:
         if not record.solar_date:
@@ -140,11 +252,16 @@ def _calc_next_birthday_date(record: BirthdayRecord, today: date) -> date | None
 
 
 def _decorate_birthday(record: BirthdayRecord) -> dict:
+    _ensure_birthday_both_calendars(record)
     data = BirthdayRecordSerializer(record).data
     today = date.today()
     next_date = _calc_next_birthday_date(record, today)
     data['next_birthday_date'] = next_date.isoformat() if next_date else None
     data['next_birthday_in_days'] = (next_date - today).days if next_date else None
+    birth_solar = record.solar_date
+    data['age_text'] = _calc_age_ym(birth_solar, today)
+    data['constellation'] = _calc_constellation(birth_solar)
+    data['lunar_date_iso'] = _format_lunar_iso(record.lunar_year, record.lunar_month, record.lunar_day)
     return data
 
 
@@ -288,20 +405,27 @@ class BirthdayView(APIView):
             if not solar_date:
                 return Response({'code': 400, 'msg': 'solar_date 必填', 'data': None})
             try:
-                data['solar_date'] = date.fromisoformat(solar_date)
+                solar = date.fromisoformat(solar_date)
+                data['solar_date'] = solar
             except Exception:
                 return Response({'code': 400, 'msg': 'solar_date 格式错误', 'data': None})
+            lunar = _solar_to_lunar(solar)
+            if lunar:
+                data.update(lunar)
         else:
             try:
-                data['lunar_year'] = int(payload.get('lunar_year') or date.today().year)
+                data['lunar_year'] = int(payload.get('lunar_year'))
             except Exception:
-                return Response({'code': 400, 'msg': 'lunar_year 参数错误', 'data': None})
+                return Response({'code': 400, 'msg': 'lunar_year 必填', 'data': None})
             try:
                 data['lunar_month'] = int(payload.get('lunar_month'))
                 data['lunar_day'] = int(payload.get('lunar_day'))
             except Exception:
                 return Response({'code': 400, 'msg': 'lunar_month/lunar_day 必填', 'data': None})
             data['lunar_is_leap'] = bool(payload.get('lunar_is_leap'))
+            solar = _lunar_to_solar(int(data['lunar_year']), int(data['lunar_month']), int(data['lunar_day']), bool(data['lunar_is_leap']))
+            if solar:
+                data['solar_date'] = solar
 
         record = BirthdayRecord.objects.create(**data)
         return Response({'code': 200, 'msg': 'ok', 'data': _decorate_birthday(record)})
@@ -335,14 +459,17 @@ class BirthdayView(APIView):
                         record.solar_date = date.fromisoformat(solar_date)
                     except Exception:
                         return Response({'code': 400, 'msg': 'solar_date 格式错误', 'data': None})
-            record.lunar_month = None
-            record.lunar_day = None
-            record.lunar_is_leap = False
-            record.lunar_year = None
+            if record.solar_date:
+                lunar = _solar_to_lunar(record.solar_date)
+                if lunar:
+                    record.lunar_year = lunar['lunar_year']
+                    record.lunar_month = lunar['lunar_month']
+                    record.lunar_day = lunar['lunar_day']
+                    record.lunar_is_leap = lunar['lunar_is_leap']
         else:
             if 'lunar_year' in payload:
                 try:
-                    record.lunar_year = int(payload.get('lunar_year') or date.today().year)
+                    record.lunar_year = int(payload.get('lunar_year'))
                 except Exception:
                     return Response({'code': 400, 'msg': 'lunar_year 参数错误', 'data': None})
             if 'lunar_month' in payload:
@@ -351,7 +478,10 @@ class BirthdayView(APIView):
                 record.lunar_day = int(payload.get('lunar_day'))
             if 'lunar_is_leap' in payload:
                 record.lunar_is_leap = bool(payload.get('lunar_is_leap'))
-            record.solar_date = None
+            if record.lunar_year and record.lunar_month and record.lunar_day:
+                solar = _lunar_to_solar(int(record.lunar_year), int(record.lunar_month), int(record.lunar_day), bool(record.lunar_is_leap))
+                if solar:
+                    record.solar_date = solar
 
         record.save()
         return Response({'code': 200, 'msg': 'ok', 'data': _decorate_birthday(record)})
