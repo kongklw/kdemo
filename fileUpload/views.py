@@ -1,16 +1,13 @@
-import os.path
-from uuid import uuid1
-
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from kdemo.settings import MEDIA_ROOT
-
-
-# Create your views here.
-
-
 from rest_framework.permissions import IsAuthenticated
 from .models import File
+from .models import MediaAsset
+from django.conf import settings
+from uuid import uuid4
+from pathlib import Path
+import boto3
+from botocore.config import Config
 
 class CommonFileUpload(APIView):
     permission_classes = [IsAuthenticated]
@@ -18,7 +15,7 @@ class CommonFileUpload(APIView):
     def post(self, request, *args, **kwargs):
         file = request.FILES.get('file', None)
         if not file:
-             return Response({'code': 400, 'msg': 'No file uploaded', 'data': None})
+            return Response({'code': 400, 'msg': 'No file uploaded', 'data': None})
         
         # 保存文件记录到数据库并关联用户
         # FileField 会自动处理文件保存到 MEDIA_ROOT/files/... (由 user_directory_path 定义)
@@ -45,3 +42,169 @@ class CommonFileUpload(APIView):
         #             f.write(content)
         #
         # return Response({'code': 200, 'data': file_list, 'msg': 'ok'})
+
+
+def _get_s3_client():
+    verify = True
+    if hasattr(settings, 'MINIO_VERIFY_SSL'):
+        verify = bool(settings.MINIO_VERIFY_SSL)
+    return boto3.client(
+        's3',
+        aws_access_key_id=getattr(settings, 'AWS_ACCESS_KEY_ID', None),
+        aws_secret_access_key=getattr(settings, 'AWS_SECRET_ACCESS_KEY', None),
+        endpoint_url=getattr(settings, 'AWS_S3_ENDPOINT_URL', None),
+        region_name=getattr(settings, 'AWS_S3_REGION_NAME', None),
+        verify=verify,
+        config=Config(
+            signature_version=getattr(settings, 'AWS_S3_SIGNATURE_VERSION', 's3v4'),
+            s3={'addressing_style': getattr(settings, 'AWS_S3_ADDRESSING_STYLE', 'path')},
+        ),
+    )
+
+
+def _make_object_key(purpose: str, filename: str) -> str:
+    safe_purpose = purpose.strip().lower()
+    ext = Path(filename or '').suffix
+    ext = ext[:20] if ext else ''
+    uid = uuid4().hex
+    if ext and not ext.startswith('.'):
+        ext = f'.{ext}'
+    if safe_purpose == 'baby_album':
+        prefix = 'baby_album'
+    elif safe_purpose == 'growth':
+        prefix = 'growth'
+    elif safe_purpose == 'files':
+        prefix = 'files'
+    else:
+        prefix = 'uploads'
+    return f'{prefix}/{uid}{ext}'
+
+
+class PresignInitView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        if not getattr(settings, 'USE_S3_MEDIA', False):
+            return Response({'code': 400, 'msg': 'S3 media not enabled', 'data': None})
+
+        payload = request.data or {}
+        purpose = (payload.get('purpose') or '').strip()
+        filename = (payload.get('filename') or '').strip()
+        content_type = (payload.get('content_type') or '').strip()
+        size_bytes = payload.get('size')
+        is_video = bool(payload.get('is_video', False))
+
+        if not purpose:
+            return Response({'code': 400, 'msg': 'purpose 必填', 'data': None})
+        if not filename:
+            return Response({'code': 400, 'msg': 'filename 必填', 'data': None})
+
+        bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', None)
+        endpoint = getattr(settings, 'AWS_S3_ENDPOINT_URL', None)
+        access_key = getattr(settings, 'AWS_ACCESS_KEY_ID', None)
+        secret_key = getattr(settings, 'AWS_SECRET_ACCESS_KEY', None)
+        if not bucket or not endpoint or not access_key or not secret_key:
+            return Response({'code': 500, 'msg': 'S3 configuration incomplete', 'data': None})
+
+        object_key = _make_object_key(purpose, filename)
+        asset = MediaAsset.objects.create(
+            user=request.user,
+            bucket=bucket,
+            object_key=object_key,
+            original_name=filename[:255],
+            content_type=content_type[:255] if content_type else None,
+            size_bytes=size_bytes if isinstance(size_bytes, int) else None,
+            is_video=is_video,
+            purpose=purpose[:64],
+            status=MediaAsset.Status.INIT,
+        )
+
+        s3 = _get_s3_client()
+        put_params = {'Bucket': bucket, 'Key': object_key}
+        if content_type:
+            put_params['ContentType'] = content_type
+        upload_url = s3.generate_presigned_url(
+            ClientMethod='put_object',
+            Params=put_params,
+            ExpiresIn=int(payload.get('expires_in', 600) or 600),
+        )
+
+        return Response({
+            'code': 200,
+            'msg': 'ok',
+            'data': {
+                'asset_id': asset.id,
+                'bucket': bucket,
+                'object_key': object_key,
+                'upload_url': upload_url,
+                'headers': {'Content-Type': content_type} if content_type else {},
+            }
+        })
+
+
+class PresignCompleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        if not getattr(settings, 'USE_S3_MEDIA', False):
+            return Response({'code': 400, 'msg': 'S3 media not enabled', 'data': None})
+
+        payload = request.data or {}
+        asset_id = payload.get('asset_id')
+        if not asset_id:
+            return Response({'code': 400, 'msg': 'asset_id 必填', 'data': None})
+
+        asset = MediaAsset.objects.filter(id=asset_id, user=request.user).first()
+        if not asset:
+            return Response({'code': 404, 'msg': 'asset 不存在', 'data': None})
+
+        s3 = _get_s3_client()
+        try:
+            head = s3.head_object(Bucket=asset.bucket, Key=asset.object_key)
+        except Exception:
+            return Response({'code': 400, 'msg': '对象未找到或不可访问', 'data': None})
+
+        etag = head.get('ETag')
+        size = head.get('ContentLength')
+        content_type = head.get('ContentType') or asset.content_type
+
+        asset.etag = (etag or '').strip('"') if etag else asset.etag
+        asset.size_bytes = int(size) if isinstance(size, int) else asset.size_bytes
+        asset.content_type = content_type
+        asset.status = MediaAsset.Status.UPLOADED
+        asset.save(update_fields=['etag', 'size_bytes', 'content_type', 'status', 'updated_at'])
+
+        return Response({
+            'code': 200,
+            'msg': 'ok',
+            'data': {
+                'asset_id': asset.id,
+                'bucket': asset.bucket,
+                'object_key': asset.object_key,
+            }
+        })
+
+
+class PresignGetUrlView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        if not getattr(settings, 'USE_S3_MEDIA', False):
+            return Response({'code': 400, 'msg': 'S3 media not enabled', 'data': None})
+
+        asset_id = request.query_params.get('asset_id')
+        if not asset_id:
+            return Response({'code': 400, 'msg': 'asset_id 必填', 'data': None})
+
+        asset = MediaAsset.objects.filter(id=asset_id, user=request.user).first()
+        if not asset:
+            return Response({'code': 404, 'msg': 'asset 不存在', 'data': None})
+
+        s3 = _get_s3_client()
+        url = s3.generate_presigned_url(
+            ClientMethod='get_object',
+            Params={'Bucket': asset.bucket, 'Key': asset.object_key},
+            ExpiresIn=int(request.query_params.get('expires_in', 600) or 600),
+        )
+
+        return Response({'code': 200, 'msg': 'ok', 'data': {'url': url}})

@@ -15,3 +15,26 @@ class File(models.Model):
     file = models.FileField(upload_to=user_directory_path, null=True)
     upload_method = models.CharField(max_length=20, verbose_name="Upload Method")
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class MediaAsset(models.Model):
+    class Status(models.TextChoices):
+        INIT = 'init', 'init'
+        UPLOADED = 'uploaded', 'uploaded'
+        BOUND = 'bound', 'bound'
+        DELETED = 'deleted', 'deleted'
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    bucket = models.CharField(max_length=128)
+    object_key = models.CharField(max_length=1024)
+    original_name = models.CharField(max_length=255, blank=True, null=True)
+    content_type = models.CharField(max_length=255, blank=True, null=True)
+    size_bytes = models.BigIntegerField(blank=True, null=True)
+    etag = models.CharField(max_length=255, blank=True, null=True)
+    is_video = models.BooleanField(default=False)
+    purpose = models.CharField(max_length=64)
+    ref_type = models.CharField(max_length=64, blank=True, null=True)
+    ref_id = models.BigIntegerField(blank=True, null=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.INIT)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)

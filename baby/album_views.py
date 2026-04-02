@@ -1,8 +1,9 @@
 from rest_framework import permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from .models import BabyAlbum, AlbumPhoto
+from fileUpload.models import MediaAsset
 from .serializers import BabyAlbumSerializer
 import json
 import logging
@@ -11,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class BabyAlbumListCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get(self, request):
         try:
@@ -68,6 +69,7 @@ class BabyAlbumListCreateView(APIView):
                 except:
                     data['tags'] = []
             
+            media_asset_ids = data.get('media_asset_ids') if isinstance(data, dict) else None
             serializer = BabyAlbumSerializer(data=data, context={'request': request})
             if serializer.is_valid():
                 album = serializer.save()
@@ -79,15 +81,26 @@ class BabyAlbumListCreateView(APIView):
                     # Try 'file' as well just in case
                     images = request.FILES.getlist('file')
 
-                for image in images:
-                    is_video = False
-                    # Check if file is video by content_type or extension
-                    if hasattr(image, 'content_type') and image.content_type.startswith('video/'):
-                        is_video = True
-                    elif hasattr(image, 'name') and image.name.lower().endswith(('.mp4', '.mov', '.avi', '.wmv', '.flv', '.mkv', '.webm')):
-                        is_video = True
-                        
-                    AlbumPhoto.objects.create(album=album, image=image, is_video=is_video)
+                if images:
+                    for image in images:
+                        is_video = False
+                        if hasattr(image, 'content_type') and image.content_type.startswith('video/'):
+                            is_video = True
+                        elif hasattr(image, 'name') and image.name.lower().endswith(('.mp4', '.mov', '.avi', '.wmv', '.flv', '.mkv', '.webm')):
+                            is_video = True
+                        AlbumPhoto.objects.create(album=album, image=image, is_video=is_video)
+                elif isinstance(media_asset_ids, list) and media_asset_ids:
+                    assets = list(MediaAsset.objects.filter(user=request.user, id__in=media_asset_ids, status=MediaAsset.Status.UPLOADED))
+                    by_id = {a.id: a for a in assets}
+                    for aid in media_asset_ids:
+                        asset = by_id.get(aid)
+                        if not asset:
+                            continue
+                        AlbumPhoto.objects.create(album=album, image=asset.object_key, is_video=asset.is_video)
+                        asset.ref_type = 'baby_album'
+                        asset.ref_id = album.id
+                        asset.status = MediaAsset.Status.BOUND
+                        asset.save(update_fields=['ref_type', 'ref_id', 'status', 'updated_at'])
                 
                 # Refresh to include photos in response
                 return Response({'code': 200, 'msg': 'ok', 'data': BabyAlbumSerializer(album).data})
