@@ -356,6 +356,8 @@ class GrowthRecordSerializer(serializers.ModelSerializer):
 
 
 class AlbumPhotoSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+    poster = serializers.SerializerMethodField()
     thumb = serializers.SerializerMethodField()
     hls = serializers.SerializerMethodField()
     dash = serializers.SerializerMethodField()
@@ -375,23 +377,36 @@ class AlbumPhotoSerializer(serializers.ModelSerializer):
     def get_thumb(self, obj):
         if not obj or getattr(obj, 'is_video', False):
             return ''
-        request = self.context.get('request') if isinstance(self.context, dict) else None
         base = f'baby_album/thumbs/{self._stream_id(obj)}_w400'
-        return _absolute_url(request, f'/file/img?base={quote(base)}')
+        return f'/file/img?base={quote(base)}'
 
     def get_hls(self, obj):
         if not obj or not getattr(obj, 'is_video', False):
             return ''
-        request = self.context.get('request') if isinstance(self.context, dict) else None
         sid = self._stream_id(obj)
-        return _absolute_url(request, f'/baby/albums/video/{quote(sid)}/hls/master.m3u8')
+        return f'/baby/albums/video/{quote(sid)}/hls/master.m3u8'
 
     def get_dash(self, obj):
         if not obj or not getattr(obj, 'is_video', False):
             return ''
-        request = self.context.get('request') if isinstance(self.context, dict) else None
         sid = self._stream_id(obj)
-        return _absolute_url(request, f'/baby/albums/video/{quote(sid)}/dash/manifest.mpd')
+        return f'/baby/albums/video/{quote(sid)}/dash/manifest.mpd'
+
+    def get_image(self, obj):
+        if not obj or not getattr(obj, 'image', None):
+            return ''
+        key = getattr(obj.image, 'name', None) or ''
+        if not key:
+            return ''
+        return f'/file/r?key={quote(key)}'
+
+    def get_poster(self, obj):
+        if not obj or not getattr(obj, 'poster', None):
+            return ''
+        key = getattr(obj.poster, 'name', None) or ''
+        if not key:
+            return ''
+        return f'/file/r?key={quote(key)}'
 
 
 class BabyAlbumSerializer(serializers.ModelSerializer):
