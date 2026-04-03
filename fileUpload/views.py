@@ -12,6 +12,7 @@ from pathlib import Path
 import boto3
 from botocore.config import Config
 import mimetypes
+import re
 
 class CommonFileUpload(APIView):
     permission_classes = [IsAuthenticated]
@@ -249,3 +250,48 @@ class FileRedirectView(APIView):
         except Exception:
             return Response({'code': 404, 'msg': 'file not found', 'data': None}, status=404)
         return FileResponse(f, content_type=content_type or 'application/octet-stream')
+
+
+class ImageBestRedirectView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    _SAFE_BASE_RE = re.compile(r'^[a-zA-Z0-9/_\-.]+$')
+
+    def get(self, request, *args, **kwargs):
+        base = (request.query_params.get('base') or '').strip()
+        if not base or not self._SAFE_BASE_RE.match(base) or '..' in base:
+            return Response({'code': 400, 'msg': 'base required', 'data': None}, status=400)
+
+        accept = (request.headers.get('Accept') or '').lower()
+        candidates = []
+        if 'image/avif' in accept:
+            candidates.append(f'{base}.avif')
+        if 'image/webp' in accept:
+            candidates.append(f'{base}.webp')
+        candidates.append(f'{base}.jpg')
+
+        expires_in = int(request.query_params.get('expires_in', 600) or 600)
+
+        if getattr(settings, 'USE_S3_MEDIA', False):
+            bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', None)
+            if not bucket:
+                return Response({'code': 500, 'msg': 'S3 bucket not configured', 'data': None}, status=500)
+            s3 = _get_s3_client()
+            for key in candidates:
+                try:
+                    s3.head_object(Bucket=bucket, Key=key)
+                except Exception:
+                    continue
+                url = s3.generate_presigned_url(
+                    ClientMethod='get_object',
+                    Params={'Bucket': bucket, 'Key': key},
+                    ExpiresIn=expires_in,
+                )
+                return redirect(url)
+            return Response({'code': 404, 'msg': 'file not found', 'data': None}, status=404)
+
+        for key in candidates:
+            if default_storage.exists(key):
+                return redirect(f'/file/r?key={key}')
+        return Response({'code': 404, 'msg': 'file not found', 'data': None}, status=404)

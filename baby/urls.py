@@ -42,6 +42,9 @@ urlpatterns = [
     # baby album
     path('albums/', album_views.BabyAlbumListCreateView.as_view()),
     path('albums/<int:pk>/', album_views.BabyAlbumDetailView.as_view()),
+    path('albums/video/<str:stream_id>/playback', album_views.AlbumVideoPlaybackInfoView.as_view()),
+    path('albums/video/<str:stream_id>/hls/<path:playlist_path>', album_views.AlbumVideoHlsView.as_view()),
+    path('albums/video/<str:stream_id>/dash/<path:dash_path>', album_views.AlbumVideoDashView.as_view()),
 
     # body metrics
     path('growth_records/', body_views.GrowthRecordListCreateView.as_view()),

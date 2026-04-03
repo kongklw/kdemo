@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import mimetypes
+import shutil
+import tempfile
 from pathlib import Path
 
 import boto3
@@ -9,6 +11,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 from baby.models import AlbumPhoto
+from baby.album_views import _ensure_image_variants, _ensure_video_streams
 
 
 def _get_s3_client():
@@ -50,6 +53,8 @@ class Command(BaseCommand):
         parser.add_argument('--prefix', type=str, default='baby_album/legacy')
         parser.add_argument('--overwrite', action='store_true')
         parser.add_argument('--log-every', type=int, default=1)
+        parser.add_argument('--process-variants', action='store_true')
+        parser.add_argument('--variants-only', action='store_true')
 
     def handle(self, *args, **options):
         if not getattr(settings, 'USE_S3_MEDIA', False):
@@ -74,6 +79,8 @@ class Command(BaseCommand):
         prefix = (options['prefix'] or 'baby_album/legacy').strip().strip('/')
         overwrite = bool(options['overwrite'])
         log_every = int(options['log_every'] or 0)
+        process_variants = bool(options['process_variants'])
+        variants_only = bool(options['variants_only'])
         if log_every < 0:
             log_every = 0
 
@@ -104,6 +111,26 @@ class Command(BaseCommand):
             src_name = str(photo.image.name)
             if src_name.startswith('http://') or src_name.startswith('https://'):
                 skipped += 1
+                continue
+
+            if variants_only:
+                if not process_variants or dry_run:
+                    migrated += 1
+                    continue
+                tmp_dir = tempfile.mkdtemp(prefix='album_media_')
+                tmp_path = str(Path(tmp_dir) / Path(src_name).name)
+                try:
+                    s3.download_file(bucket, src_name, tmp_path)
+                    if photo.is_video:
+                        _ensure_video_streams(photo, tmp_path, s3=s3, bucket=bucket)
+                    else:
+                        _ensure_image_variants(photo, tmp_path, s3=s3, bucket=bucket)
+                    migrated += 1
+                except Exception as e:
+                    failed += 1
+                    self.stderr.write(f'failed variants id={photo.id} key={src_name} err={e}')
+                finally:
+                    shutil.rmtree(tmp_dir, ignore_errors=True)
                 continue
 
             if src_name.startswith(f'{prefix}/'):
@@ -162,5 +189,19 @@ class Command(BaseCommand):
             except Exception as e:
                 failed += 1
                 self.stderr.write(f'failed id={photo.id} src={src_name} err={e}')
+
+            if process_variants and not dry_run:
+                tmp_dir = tempfile.mkdtemp(prefix='album_media_')
+                tmp_path = str(Path(tmp_dir) / Path(dest_key).name)
+                try:
+                    s3.download_file(bucket, dest_key, tmp_path)
+                    if photo.is_video:
+                        _ensure_video_streams(photo, tmp_path, s3=s3, bucket=bucket)
+                    else:
+                        _ensure_image_variants(photo, tmp_path, s3=s3, bucket=bucket)
+                except Exception as e:
+                    self.stderr.write(f'failed variants id={photo.id} key={dest_key} err={e}')
+                finally:
+                    shutil.rmtree(tmp_dir, ignore_errors=True)
 
         self.stdout.write(f'migrated={migrated} skipped={skipped} failed={failed}')

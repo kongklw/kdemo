@@ -5,6 +5,7 @@ from .serializers import BabyInfoSerializer
 import logging
 from rest_framework import serializers
 from rest_framework.permissions import IsAuthenticated
+from .album_views import process_image_variants_for_key
 logger = logging.getLogger(__name__)
 
 
@@ -44,7 +45,13 @@ class BabyInfoView(APIView):
 
             if serializer.is_valid():
                 # Save with user context
-                serializer.save(user=user)
+                instance = serializer.save(user=user)
+                try:
+                    key = getattr(getattr(instance, 'image', None), 'name', None) or ''
+                    if key:
+                        process_image_variants_for_key(key=key, base_key=f'baby/thumbs/bi_{instance.id}_w200', width=200)
+                except Exception:
+                    logger.exception("baby info image post-process failed")
                 logger.info("BabyInfo saved", extra={"user_id": user.id})
                 return Response({'code': 200, 'msg': 'ok', 'data': serializer.data})
             else:

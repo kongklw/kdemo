@@ -10,6 +10,7 @@ from django.core.management.base import BaseCommand, CommandError
 
 from baby.models import BabyInfo, GrowthRecord, BabyExpense
 from fileUpload.models import File
+from baby.album_views import process_image_variants_for_key
 
 
 def _get_s3_client():
@@ -91,6 +92,8 @@ class Command(BaseCommand):
         parser.add_argument('--overwrite', action='store_true')
         parser.add_argument('--target', type=str, default='all')
         parser.add_argument('--log-every', type=int, default=50)
+        parser.add_argument('--process-variants', action='store_true')
+        parser.add_argument('--variants-only', action='store_true')
 
     def handle(self, *args, **options):
         if not getattr(settings, 'USE_S3_MEDIA', False):
@@ -113,6 +116,8 @@ class Command(BaseCommand):
         overwrite = bool(options['overwrite'])
         target = str(options['target'] or 'all').strip().lower()
         log_every = int(options['log_every'] or 0)
+        process_variants = bool(options['process_variants'])
+        variants_only = bool(options['variants_only'])
         if log_every < 0:
             log_every = 0
 
@@ -149,6 +154,16 @@ class Command(BaseCommand):
                 it = _iter_expense_keys(qs if limit <= 0 else qs[:limit])
                 for exp_id, key in it:
                     processed += 1
+                    if variants_only:
+                        if process_variants and not dry_run:
+                            try:
+                                process_image_variants_for_key(key=key, base_key=f'files/thumbs/expense_{exp_id}_w400', width=400)
+                            except Exception as e:
+                                failed += 1
+                                self.stderr.write(f'failed variants target={label} id={exp_id} key={key} err={e}')
+                        else:
+                            skipped += 1
+                        continue
                     local_path = (media_root_path / key).resolve()
                     if not local_path.exists() or local_path.is_dir():
                         skipped += 1
@@ -169,6 +184,12 @@ class Command(BaseCommand):
                     except Exception as e:
                         failed += 1
                         self.stderr.write(f'failed target={label} id={exp_id} key={key} err={e}')
+
+                    if process_variants and not dry_run:
+                        try:
+                            process_image_variants_for_key(key=key, base_key=f'files/thumbs/expense_{exp_id}_w400', width=400)
+                        except Exception as e:
+                            self.stderr.write(f'failed variants target={label} id={exp_id} key={key} err={e}')
             else:
                 for obj in qs.iterator(chunk_size=200):
                     processed += 1
@@ -179,6 +200,22 @@ class Command(BaseCommand):
                         continue
 
                     key = str(src_name).replace('\\', '/').lstrip('/')
+                    if variants_only:
+                        if process_variants and not dry_run:
+                            try:
+                                if label == 'baby_info':
+                                    process_image_variants_for_key(key=key, base_key=f'baby/thumbs/bi_{getattr(obj, pk_name, 0)}_w200', width=200)
+                                elif label == 'growth_record':
+                                    process_image_variants_for_key(key=key, base_key=f'growth/thumbs/gr_{getattr(obj, pk_name, 0)}_w400', width=400)
+                                elif label == 'uploaded_files':
+                                    process_image_variants_for_key(key=key, base_key=f'files/thumbs/f_{getattr(obj, pk_name, 0)}_w400', width=400)
+                            except Exception as e:
+                                failed += 1
+                                pk_val = getattr(obj, pk_name, None)
+                                self.stderr.write(f'failed variants target={label} {pk_name}={pk_val} key={key} err={e}')
+                        else:
+                            skipped += 1
+                        continue
                     local_path = (media_root_path / key).resolve()
                     if not local_path.exists() or local_path.is_dir():
                         skipped += 1
@@ -201,5 +238,17 @@ class Command(BaseCommand):
                         failed += 1
                         pk_val = getattr(obj, pk_name, None)
                         self.stderr.write(f'failed target={label} {pk_name}={pk_val} key={key} err={e}')
+
+                    if process_variants and not dry_run:
+                        try:
+                            if label == 'baby_info':
+                                process_image_variants_for_key(key=key, base_key=f'baby/thumbs/bi_{getattr(obj, pk_name, 0)}_w200', width=200)
+                            elif label == 'growth_record':
+                                process_image_variants_for_key(key=key, base_key=f'growth/thumbs/gr_{getattr(obj, pk_name, 0)}_w400', width=400)
+                            elif label == 'uploaded_files':
+                                process_image_variants_for_key(key=key, base_key=f'files/thumbs/f_{getattr(obj, pk_name, 0)}_w400', width=400)
+                        except Exception as e:
+                            pk_val = getattr(obj, pk_name, None)
+                            self.stderr.write(f'failed variants target={label} {pk_name}={pk_val} key={key} err={e}')
 
             self.stdout.write(f'target={label} uploaded={uploaded} skipped={skipped} failed={failed}')

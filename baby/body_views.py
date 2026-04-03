@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 
 from .models import GrowthRecord
 from .serializers import GrowthRecordSerializer
+from .album_views import process_image_variants_for_key
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +75,12 @@ class GrowthRecordListCreateView(APIView):
             head_circumference_cm=serializer.validated_data.get('head_circumference_cm'),
             photo=request.FILES.get('photo')
         )
+        try:
+            key = getattr(getattr(record, 'photo', None), 'name', None) or ''
+            if key:
+                process_image_variants_for_key(key=key, base_key=f'growth/thumbs/gr_{record.id}_w400', width=400)
+        except Exception:
+            logger.exception("growth photo post-process failed")
 
         return Response({'code': 200, 'msg': 'ok', 'data': GrowthRecordSerializer(record, context={'request': request}).data})
 
@@ -123,6 +130,12 @@ class GrowthRecordDetailView(APIView):
         if request.FILES.get('photo'):
             record.photo = request.FILES.get('photo')
             record.save(update_fields=['photo', 'updated_at'])
+            try:
+                key = getattr(getattr(record, 'photo', None), 'name', None) or ''
+                if key:
+                    process_image_variants_for_key(key=key, base_key=f'growth/thumbs/gr_{record.id}_w400', width=400)
+            except Exception:
+                logger.exception("growth photo post-process failed")
         else:
             remove_photo = str(data.get('remove_photo', '')).lower() in ['1', 'true', 'yes']
             if remove_photo and record.photo:

@@ -87,10 +87,11 @@ class GrowingBlogSerializer(serializers.ModelSerializer):
 class BabyInfoSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
     image_full = serializers.SerializerMethodField()
+    image_thumb = serializers.SerializerMethodField()
 
     class Meta:
         model = BabyInfo
-        fields = ['id', 'user', 'name', 'birthday', 'birth_weight', 'birth_height', 'gender', 'image', 'image_full', 'status', 'birth_week', 'is_sensitive', 'is_only_child']
+        fields = ['id', 'user', 'name', 'birthday', 'birth_weight', 'birth_height', 'gender', 'image', 'image_full', 'image_thumb', 'status', 'birth_week', 'is_sensitive', 'is_only_child']
         read_only_fields = ['user']
 
     def get_status(self, obj):
@@ -128,6 +129,12 @@ class BabyInfoSerializer(serializers.ModelSerializer):
             return _absolute_url(request, obj.image.url)
         except Exception:
             return ''
+
+    def get_image_thumb(self, obj):
+        request = self.context.get('request') if isinstance(self.context, dict) else None
+        if not obj or not getattr(obj, 'id', None) or not getattr(obj, 'image', None):
+            return ''
+        return _absolute_url(request, f'/file/img?base={quote(f"baby/thumbs/bi_{obj.id}_w200")}')
 
 
 class MenstrualSettingSerializer(serializers.ModelSerializer):
@@ -297,10 +304,11 @@ def _calc_age_str(birthday, target_date):
 class GrowthRecordSerializer(serializers.ModelSerializer):
     age_description = serializers.SerializerMethodField()
     photo_full = serializers.SerializerMethodField()
+    photo_thumb = serializers.SerializerMethodField()
 
     class Meta:
         model = GrowthRecord
-        fields = ['id', 'user', 'measure_date', 'height_cm', 'weight_kg', 'head_circumference_cm', 'photo', 'photo_full', 'created_at', 'updated_at', 'age_description']
+        fields = ['id', 'user', 'measure_date', 'height_cm', 'weight_kg', 'head_circumference_cm', 'photo', 'photo_full', 'photo_thumb', 'created_at', 'updated_at', 'age_description']
         read_only_fields = ['user', 'created_at', 'updated_at']
 
     def get_age_description(self, obj):
@@ -340,11 +348,50 @@ class GrowthRecordSerializer(serializers.ModelSerializer):
         except Exception:
             return ''
 
+    def get_photo_thumb(self, obj):
+        request = self.context.get('request') if isinstance(self.context, dict) else None
+        if not obj or not getattr(obj, 'id', None) or not getattr(obj, 'photo', None):
+            return ''
+        return _absolute_url(request, f'/file/img?base={quote(f"growth/thumbs/gr_{obj.id}_w400")}')
+
 
 class AlbumPhotoSerializer(serializers.ModelSerializer):
+    thumb = serializers.SerializerMethodField()
+    hls = serializers.SerializerMethodField()
+    dash = serializers.SerializerMethodField()
+
     class Meta:
         model = AlbumPhoto
-        fields = ['id', 'image', 'poster', 'is_video', 'created_at']
+        fields = ['id', 'image', 'poster', 'thumb', 'hls', 'dash', 'is_video', 'created_at']
+
+    def _stream_id(self, obj) -> str:
+        key = getattr(getattr(obj, 'image', None), 'name', None) or ''
+        stem = (key.rsplit('/', 1)[-1].rsplit('.', 1)[0] if key else '').strip()
+        if not stem:
+            return str(getattr(obj, 'id', ''))
+        stem = re.sub(r'[^a-zA-Z0-9_-]+', '_', stem)[:80]
+        return stem or str(getattr(obj, 'id', ''))
+
+    def get_thumb(self, obj):
+        if not obj or getattr(obj, 'is_video', False):
+            return ''
+        request = self.context.get('request') if isinstance(self.context, dict) else None
+        base = f'baby_album/thumbs/{self._stream_id(obj)}_w400'
+        return _absolute_url(request, f'/file/img?base={quote(base)}')
+
+    def get_hls(self, obj):
+        if not obj or not getattr(obj, 'is_video', False):
+            return ''
+        request = self.context.get('request') if isinstance(self.context, dict) else None
+        sid = self._stream_id(obj)
+        return _absolute_url(request, f'/baby/albums/video/{quote(sid)}/hls/master.m3u8')
+
+    def get_dash(self, obj):
+        if not obj or not getattr(obj, 'is_video', False):
+            return ''
+        request = self.context.get('request') if isinstance(self.context, dict) else None
+        sid = self._stream_id(obj)
+        return _absolute_url(request, f'/baby/albums/video/{quote(sid)}/dash/manifest.mpd')
 
 
 class BabyAlbumSerializer(serializers.ModelSerializer):

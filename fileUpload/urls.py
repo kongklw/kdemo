@@ -16,6 +16,7 @@ urlpatterns = [
     path('upload', views.CommonFileUpload.as_view()),
     path('r', views.FileRedirectView.as_view()),
     path('r/<int:file_id>', views.FileRedirectView.as_view()),
+    path('img', views.ImageBestRedirectView.as_view()),
     path('presign/init', views.PresignInitView.as_view()),
     path('presign/complete', views.PresignCompleteView.as_view()),
     path('presign/url', views.PresignGetUrlView.as_view()),
