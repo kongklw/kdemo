@@ -8,7 +8,7 @@ from botocore.config import Config
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from baby.models import BabyInfo, GrowthRecord
+from baby.models import BabyInfo, GrowthRecord, BabyExpense
 from fileUpload.models import File
 
 
@@ -54,6 +54,35 @@ def _upload_one(s3, bucket: str, local_path: Path, key: str, overwrite: bool) ->
             s3.upload_fileobj(f, bucket, key)
     return True, 'uploaded'
 
+def _extract_media_key(raw: str) -> str:
+    if raw is None:
+        return ''
+    raw = str(raw).strip()
+    if not raw:
+        return ''
+    if raw.startswith('data:image/'):
+        return ''
+
+    normalized = raw.replace('\\', '/')
+    if '/media/' in normalized:
+        normalized = normalized.split('/media/', 1)[1]
+
+    return normalized.lstrip('/')
+
+
+def _iter_expense_keys(qs):
+    seen = set()
+    for exp in qs.iterator(chunk_size=200):
+        key = _extract_media_key(getattr(exp, 'image_url', None))
+        if not key:
+            continue
+        if key.startswith('http://') or key.startswith('https://'):
+            continue
+        if key in seen:
+            continue
+        seen.add(key)
+        yield exp.id, key
+
 
 class Command(BaseCommand):
     def add_arguments(self, parser):
@@ -96,15 +125,19 @@ class Command(BaseCommand):
             targets.append(('growth_record', GrowthRecord.objects.order_by('id'), 'photo', 'id'))
         if target in ['all', 'files', 'uploaded_files', 'fileupload']:
             targets.append(('uploaded_files', File.objects.order_by('id'), 'file', 'id'))
+        if target in ['all', 'expense', 'expenses']:
+            targets.append(('expense', BabyExpense.objects.order_by('id'), 'image_url', 'id'))
 
         if not targets:
-            raise CommandError('target 无效，可选: all/baby_info/growth_record/files')
+            raise CommandError('target 无效，可选: all/baby_info/growth_record/files/expense')
 
         for label, qs, field_name, pk_name in targets:
-            if limit > 0:
-                qs = qs[:limit]
-
-            total = qs.count()
+            if label != 'expense':
+                if limit > 0:
+                    qs = qs[:limit]
+                total = qs.count()
+            else:
+                total = qs.count() if limit <= 0 else min(limit, qs.count())
             processed = 0
             uploaded = 0
             skipped = 0
@@ -112,37 +145,61 @@ class Command(BaseCommand):
 
             self.stdout.write(f'target={label} total={total} dry_run={dry_run} bucket={bucket}')
 
-            for obj in qs.iterator(chunk_size=200):
-                processed += 1
-                file_field = getattr(obj, field_name, None)
-                src_name = getattr(file_field, 'name', None) if file_field else None
-                if not src_name:
-                    skipped += 1
-                    continue
+            if label == 'expense':
+                it = _iter_expense_keys(qs if limit <= 0 else qs[:limit])
+                for exp_id, key in it:
+                    processed += 1
+                    local_path = (media_root_path / key).resolve()
+                    if not local_path.exists() or local_path.is_dir():
+                        skipped += 1
+                        continue
 
-                key = str(src_name).replace('\\', '/').lstrip('/')
-                local_path = (media_root_path / key).resolve()
-                if not local_path.exists() or local_path.is_dir():
-                    skipped += 1
-                    continue
+                    if log_every and (processed == 1 or processed % log_every == 0):
+                        self.stdout.write(f'[{processed}/{total}] {label} id={exp_id} key={key}')
 
-                if log_every and (processed == 1 or processed % log_every == 0):
-                    pk_val = getattr(obj, pk_name, None)
-                    self.stdout.write(f'[{processed}/{total}] {label} {pk_name}={pk_val} key={key}')
-
-                try:
-                    if not dry_run:
-                        did_upload, _ = _upload_one(s3, bucket, local_path, key, overwrite=overwrite)
-                        if did_upload:
-                            uploaded += 1
+                    try:
+                        if not dry_run:
+                            did_upload, _ = _upload_one(s3, bucket, local_path, key, overwrite=overwrite)
+                            if did_upload:
+                                uploaded += 1
+                            else:
+                                skipped += 1
                         else:
-                            skipped += 1
-                    else:
-                        uploaded += 1
-                except Exception as e:
-                    failed += 1
-                    pk_val = getattr(obj, pk_name, None)
-                    self.stderr.write(f'failed target={label} {pk_name}={pk_val} key={key} err={e}')
+                            uploaded += 1
+                    except Exception as e:
+                        failed += 1
+                        self.stderr.write(f'failed target={label} id={exp_id} key={key} err={e}')
+            else:
+                for obj in qs.iterator(chunk_size=200):
+                    processed += 1
+                    file_field = getattr(obj, field_name, None)
+                    src_name = getattr(file_field, 'name', None) if file_field else None
+                    if not src_name:
+                        skipped += 1
+                        continue
+
+                    key = str(src_name).replace('\\', '/').lstrip('/')
+                    local_path = (media_root_path / key).resolve()
+                    if not local_path.exists() or local_path.is_dir():
+                        skipped += 1
+                        continue
+
+                    if log_every and (processed == 1 or processed % log_every == 0):
+                        pk_val = getattr(obj, pk_name, None)
+                        self.stdout.write(f'[{processed}/{total}] {label} {pk_name}={pk_val} key={key}')
+
+                    try:
+                        if not dry_run:
+                            did_upload, _ = _upload_one(s3, bucket, local_path, key, overwrite=overwrite)
+                            if did_upload:
+                                uploaded += 1
+                            else:
+                                skipped += 1
+                        else:
+                            uploaded += 1
+                    except Exception as e:
+                        failed += 1
+                        pk_val = getattr(obj, pk_name, None)
+                        self.stderr.write(f'failed target={label} {pk_name}={pk_val} key={key} err={e}')
 
             self.stdout.write(f'target={label} uploaded={uploaded} skipped={skipped} failed={failed}')
-

@@ -194,21 +194,28 @@ class BabyExpenseSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_image_url_full(self, obj):
-        raw = getattr(obj, 'image_url', None) or ''
-        raw = str(raw).strip()
+        raw = str(getattr(obj, 'image_url', None) or '').strip()
         if not raw:
             return ''
         if raw.startswith('data:image/'):
             return raw
         if raw.startswith('http://') or raw.startswith('https://'):
-            return raw
+            if '/media/' not in raw:
+                return raw
+            raw = raw.split('/media/', 1)[1]
 
         request = self.context.get('request') if isinstance(self.context, dict) else None
+        key = raw.replace('\\', '/')
+        if '/media/' in key:
+            key = key.split('/media/', 1)[1]
+        key = key.lstrip('/')
+        if not key:
+            return ''
 
-        file_obj = File.objects.filter(user_id=getattr(obj, 'user_id', None), file=raw).first()
+        file_obj = File.objects.filter(user_id=getattr(obj, 'user_id', None), file=key).first()
         if file_obj and getattr(file_obj, 'file', None):
             try:
-                return _absolute_url(request, file_obj.file.url)
+                key = str(getattr(file_obj.file, 'name', None) or key).replace('\\', '/').lstrip('/')
             except Exception:
                 pass
 
@@ -219,7 +226,7 @@ class BabyExpenseSerializer(serializers.ModelSerializer):
                 try:
                     url = s3.generate_presigned_url(
                         ClientMethod='get_object',
-                        Params={'Bucket': bucket, 'Key': raw},
+                        Params={'Bucket': bucket, 'Key': key},
                         ExpiresIn=600,
                     )
                     return url
@@ -229,7 +236,7 @@ class BabyExpenseSerializer(serializers.ModelSerializer):
         media_url = getattr(settings, 'MEDIA_URL', '/media/')
         if not media_url.endswith('/'):
             media_url = f'{media_url}/'
-        return _absolute_url(request, f'{media_url}{raw.lstrip("/")}')
+        return _absolute_url(request, f'{media_url}{key.lstrip("/")}')
 
 def _calc_age_str(birthday, target_date):
     if not birthday or not target_date:
