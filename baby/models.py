@@ -127,6 +127,7 @@ class BabyAlbum(models.Model):
 class AlbumPhoto(models.Model):
     album = models.ForeignKey(BabyAlbum, related_name='photos', on_delete=models.CASCADE)
     image = models.FileField(upload_to='baby_album/')
+    poster = models.ImageField(upload_to='baby_album/posters/', null=True, blank=True)
     is_video = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
