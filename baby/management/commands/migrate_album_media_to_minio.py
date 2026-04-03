@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import mimetypes
 from pathlib import Path
-from uuid import uuid4
 
 import boto3
 from botocore.config import Config
@@ -38,10 +37,8 @@ def _head_object(s3, bucket: str, key: str):
 
 
 def _build_dest_key(prefix: str, photo_id: int, src_name: str) -> str:
-    ext = Path(src_name or '').suffix
-    ext = ext[:20] if ext else ''
-    uid = uuid4().hex
-    return f'{prefix}/{photo_id}/{uid}{ext}'
+    basename = Path(src_name or '').name
+    return f'{prefix}/{photo_id}_{basename}'
 
 
 class Command(BaseCommand):
@@ -52,6 +49,7 @@ class Command(BaseCommand):
         parser.add_argument('--user-id', type=int, default=0)
         parser.add_argument('--prefix', type=str, default='baby_album/legacy')
         parser.add_argument('--overwrite', action='store_true')
+        parser.add_argument('--log-every', type=int, default=1)
 
     def handle(self, *args, **options):
         if not getattr(settings, 'USE_S3_MEDIA', False):
@@ -75,6 +73,9 @@ class Command(BaseCommand):
         user_id = int(options['user_id'] or 0)
         prefix = (options['prefix'] or 'baby_album/legacy').strip().strip('/')
         overwrite = bool(options['overwrite'])
+        log_every = int(options['log_every'] or 0)
+        if log_every < 0:
+            log_every = 0
 
         s3 = _get_s3_client()
 
@@ -86,14 +87,16 @@ class Command(BaseCommand):
         if limit > 0:
             qs = qs[:limit]
 
-        total = qs.count() if limit <= 0 else min(limit, qs.count())
+        total = qs.count()
         migrated = 0
         skipped = 0
         failed = 0
 
         self.stdout.write(f'total={total} dry_run={dry_run} bucket={bucket} prefix={prefix}')
 
+        processed = 0
         for photo in qs.iterator(chunk_size=200):
+            processed += 1
             if not photo.image or not photo.image.name:
                 skipped += 1
                 continue
@@ -101,6 +104,10 @@ class Command(BaseCommand):
             src_name = str(photo.image.name)
             if src_name.startswith('http://') or src_name.startswith('https://'):
                 skipped += 1
+                continue
+
+            if src_name.startswith(f'{prefix}/'):
+                migrated += 1
                 continue
 
             local_path = (media_root_path / src_name).resolve()
@@ -114,6 +121,9 @@ class Command(BaseCommand):
 
             dest_key = _build_dest_key(prefix, photo.id, src_name)
             local_size = local_path.stat().st_size
+
+            if log_every and (processed == 1 or processed % log_every == 0):
+                self.stdout.write(f'[{processed}/{total}] id={photo.id} size={local_size} src={src_name} dest={dest_key}')
 
             existing = _head_object(s3, bucket, dest_key)
             if existing and not overwrite:

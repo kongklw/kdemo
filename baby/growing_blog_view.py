@@ -44,7 +44,7 @@ class GrowingBlogView(APIView):
         user = request.user
 
         objs = GrowingBlogModel.objects.filter(user=user).order_by('-id')
-        serializer = GrowingBlogSerializer(objs, many=True)
+        serializer = GrowingBlogSerializer(objs, many=True, context={"request": request})
 
         return Response({"code": 200, "data": serializer.data,
                          "msg": "fetch all success"})

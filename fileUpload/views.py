@@ -4,10 +4,14 @@ from rest_framework.permissions import IsAuthenticated
 from .models import File
 from .models import MediaAsset
 from django.conf import settings
+from django.http import FileResponse
+from django.core.files.storage import default_storage
+from django.shortcuts import redirect
 from uuid import uuid4
 from pathlib import Path
 import boto3
 from botocore.config import Config
+import mimetypes
 
 class CommonFileUpload(APIView):
     permission_classes = [IsAuthenticated]
@@ -27,7 +31,7 @@ class CommonFileUpload(APIView):
         file_url = file_obj.file.url
         name = file_obj.file.name # 包含路径的文件名
 
-        return Response({'code': 200, 'data': {'name': name, 'url': file_url}, 'msg': 'ok'})
+        return Response({'code': 200, 'data': {'id': file_obj.id, 'name': name, 'url': file_url}, 'msg': 'ok'})
 
         # files = request.FILES.getlist("file", None)
         # file_list = []
@@ -208,3 +212,40 @@ class PresignGetUrlView(APIView):
         )
 
         return Response({'code': 200, 'msg': 'ok', 'data': {'url': url}})
+
+
+class FileRedirectView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request, file_id=None, *args, **kwargs):
+        key = None
+        if file_id is not None:
+            file_obj = File.objects.filter(id=file_id).first()
+            if not file_obj or not getattr(file_obj, 'file', None):
+                return Response({'code': 404, 'msg': 'file not found', 'data': None}, status=404)
+            key = getattr(file_obj.file, 'name', None) or None
+        else:
+            key = (request.query_params.get('key') or '').strip() or None
+
+        if not key:
+            return Response({'code': 400, 'msg': 'key required', 'data': None}, status=400)
+
+        if getattr(settings, 'USE_S3_MEDIA', False):
+            bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', None)
+            if not bucket:
+                return Response({'code': 500, 'msg': 'S3 bucket not configured', 'data': None}, status=500)
+            s3 = _get_s3_client()
+            url = s3.generate_presigned_url(
+                ClientMethod='get_object',
+                Params={'Bucket': bucket, 'Key': key},
+                ExpiresIn=int(request.query_params.get('expires_in', 600) or 600),
+            )
+            return redirect(url)
+
+        content_type, _ = mimetypes.guess_type(key)
+        try:
+            f = default_storage.open(key, 'rb')
+        except Exception:
+            return Response({'code': 404, 'msg': 'file not found', 'data': None}, status=404)
+        return FileResponse(f, content_type=content_type or 'application/octet-stream')

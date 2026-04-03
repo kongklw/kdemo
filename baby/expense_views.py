@@ -18,8 +18,72 @@ from zoneinfo import ZoneInfo
 from decimal import Decimal, getcontext
 from kdemo.settings import MEDIA_ROOT
 import concurrent.futures
+from django.conf import settings
+import boto3
+from botocore.config import Config
 
 logger = logging.getLogger(__name__)
+
+_S3_CLIENT = None
+
+
+def _get_s3_client():
+    global _S3_CLIENT
+    if _S3_CLIENT is not None:
+        return _S3_CLIENT
+    verify = True
+    if hasattr(settings, 'MINIO_VERIFY_SSL'):
+        verify = bool(settings.MINIO_VERIFY_SSL)
+    _S3_CLIENT = boto3.client(
+        's3',
+        aws_access_key_id=getattr(settings, 'AWS_ACCESS_KEY_ID', None),
+        aws_secret_access_key=getattr(settings, 'AWS_SECRET_ACCESS_KEY', None),
+        endpoint_url=getattr(settings, 'AWS_S3_ENDPOINT_URL', None),
+        region_name=getattr(settings, 'AWS_S3_REGION_NAME', None),
+        verify=verify,
+        config=Config(
+            signature_version=getattr(settings, 'AWS_S3_SIGNATURE_VERSION', 's3v4'),
+            s3={'addressing_style': getattr(settings, 'AWS_S3_ADDRESSING_STYLE', 'path')},
+        ),
+    )
+    return _S3_CLIENT
+
+
+def _guess_image_type_from_path(path: str) -> str:
+    ext = os.path.splitext(path or '')[1].lower().lstrip('.')
+    return ext or 'jpeg'
+
+
+def _read_media_bytes(path: str) -> tuple[str, bytes]:
+    norm = (path or '').replace('\\', '/').lstrip('/')
+    image_type = _guess_image_type_from_path(norm)
+
+    if getattr(settings, 'USE_S3_MEDIA', False):
+        bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', None)
+        if bucket:
+            s3 = _get_s3_client()
+            tried = [norm]
+            if norm and not norm.startswith('files/'):
+                tried.append(f'files/{os.path.basename(norm)}')
+            for key in tried:
+                try:
+                    obj = s3.get_object(Bucket=bucket, Key=key)
+                    body = obj.get('Body')
+                    data = body.read() if body else b''
+                    if data:
+                        return _guess_image_type_from_path(key), data
+                except Exception:
+                    continue
+
+    image_path = os.path.join(MEDIA_ROOT, norm)
+    if not os.path.exists(image_path):
+        alt_path = os.path.join(MEDIA_ROOT, 'files', os.path.basename(norm))
+        if os.path.exists(alt_path):
+            image_path = alt_path
+            norm = f'files/{os.path.basename(norm)}'
+
+    with open(image_path, 'rb') as f:
+        return _guess_image_type_from_path(norm), f.read()
 
 
 class ExpenseView(APIView):
@@ -85,11 +149,8 @@ class BatchDeleteExpenseView(APIView):
 class BatchExpenseView(APIView):
 
     @staticmethod
-    #  读取本地文件，并编码为 BASE64 格式
-    def encode_image(image_path):
-        image_type = image_path[image_path.rindex('.') + 1:].lower()
-        with open(image_path, "rb") as image_file:
-            return image_type, base64.b64encode(image_file.read()).decode("utf-8")
+    def encode_image_bytes(image_type: str, raw_bytes: bytes):
+        return image_type, base64.b64encode(raw_bytes).decode("utf-8")
 
     @classmethod
     def process_image_msg(cls, path, user):
@@ -97,20 +158,9 @@ class BatchExpenseView(APIView):
         from langchain_core.messages import HumanMessage
 
         thread_id = uuid.uuid1()
-        # Fix: Normalize path separators and join correctly
-        path = path.replace('\\', '/')
-        
-        # Robustness check: if file not found at path, try looking in 'files/' subdirectory
-        # This handles cases where path might be just a filename but file is in files/
-        image_path = os.path.join(MEDIA_ROOT, path)
-        if not os.path.exists(image_path):
-            alt_path = os.path.join(MEDIA_ROOT, 'files', os.path.basename(path))
-            if os.path.exists(alt_path):
-                # Update path to include files/ prefix
-                path = 'files/' + os.path.basename(path)
-                image_path = alt_path
-
-        image_type, base64_image = cls.encode_image(image_path)
+        path = (path or '').replace('\\', '/')
+        image_type, raw = _read_media_bytes(path)
+        image_type, base64_image = cls.encode_image_bytes(image_type, raw)
         input_message = [HumanMessage(
             content=[
 
@@ -243,7 +293,7 @@ class ExpenseListView(APIView):
         page_data = queryset[start:end]
         total = queryset.count()
 
-        serializer = BabyExpenseSerializer(page_data, many=True)
+        serializer = BabyExpenseSerializer(page_data, many=True, context={'request': request})
 
         return Response({
             'code': 200,
