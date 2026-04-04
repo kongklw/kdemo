@@ -7,6 +7,7 @@ from fileUpload.models import MediaAsset
 from .serializers import BabyAlbumSerializer
 from django.conf import settings
 from django.core.files.base import File
+from django.db.utils import DataError
 from django.http import HttpResponse
 from django.shortcuts import redirect
 import json
@@ -339,6 +340,45 @@ def _ensure_video_streams(photo: AlbumPhoto, input_path: str, s3=None, bucket: s
             pass
 
 
+def _ensure_video_streams_for_src(stream_id: str, src_key: str, s3=None, bucket: str | None = None) -> None:
+    if not stream_id or not src_key or '..' in src_key:
+        return
+    if not re.match(r'^[a-zA-Z0-9/_\-.]+$', src_key):
+        return
+    if not getattr(settings, 'USE_S3_MEDIA', False) or not s3 or not bucket:
+        return
+    if not _ffmpeg_available():
+        return
+
+    hls_master_key = f'{_STREAMS_PREFIX}/{stream_id}/hls/master.m3u8'
+    if _s3_key_exists(s3, bucket, hls_master_key):
+        return
+
+    tmp_in_fd, tmp_in = tempfile.mkstemp(suffix=Path(src_key).suffix or '.mp4')
+    os.close(tmp_in_fd)
+    work_dir = tempfile.mkdtemp(prefix='album_streams_')
+    try:
+        _download_s3_object_to_file(s3, bucket, src_key, tmp_in)
+        ok_hls = _generate_hls_variants(tmp_in, work_dir)
+        ok_dash = _generate_dash_variants(tmp_in, work_dir)
+        if not ok_hls and not ok_dash:
+            return
+        if ok_hls:
+            _upload_dir_to_s3(s3, bucket, str(Path(work_dir) / 'hls'), f'{_STREAMS_PREFIX}/{stream_id}/hls')
+        if ok_dash:
+            _upload_dir_to_s3(s3, bucket, str(Path(work_dir) / 'dash'), f'{_STREAMS_PREFIX}/{stream_id}/dash')
+    finally:
+        try:
+            if tmp_in and os.path.exists(tmp_in):
+                os.remove(tmp_in)
+        except Exception:
+            pass
+        try:
+            shutil.rmtree(work_dir, ignore_errors=True)
+        except Exception:
+            pass
+
+
 def _ensure_image_variants(photo: AlbumPhoto, input_path: str, s3=None, bucket: str | None = None) -> None:
     key = getattr(photo.image, 'name', None) or ''
     sid = _safe_stem_from_key(key, fallback=str(getattr(photo, 'id', '')))
@@ -459,10 +499,11 @@ def process_image_variants_for_key(*, key: str, base_key: str, width: int = 400)
 def _process_album_photo_video(photo: AlbumPhoto, asset: MediaAsset | None = None) -> None:
     if not photo or not getattr(photo, 'is_video', False):
         return
-        return
 
     key = getattr(photo.image, 'name', None) or ''
     if not key:
+        return
+    if not _ffmpeg_available():
         return
 
     tmp_in_fd, tmp_in = tempfile.mkstemp(suffix=Path(key).suffix or '.mp4')
@@ -479,20 +520,23 @@ def _process_album_photo_video(photo: AlbumPhoto, asset: MediaAsset | None = Non
                 return
             s3 = _get_s3_client()
             _download_s3_object_to_file(s3, bucket, key, tmp_in)
-            if not _optimize_faststart(tmp_in, tmp_out):
-                return
             content_type = None
             if asset and getattr(asset, 'content_type', None):
                 content_type = asset.content_type
             if not content_type:
                 content_type, _ = mimetypes.guess_type(key)
-            _upload_file_to_s3(s3, bucket, key, tmp_out, content_type=content_type)
-            if _extract_poster(tmp_out, tmp_poster):
-                with open(tmp_poster, 'rb') as f:
-                    poster_name = f'{Path(key).stem}.jpg'
-                    photo.poster.save(poster_name, File(f), save=False)
+
+            stream_input = tmp_in
+            if _optimize_faststart(tmp_in, tmp_out):
+                _upload_file_to_s3(s3, bucket, key, tmp_out, content_type=content_type)
+                stream_input = tmp_out
+
+            if _extract_poster(stream_input, tmp_poster):
+                poster_key = f'baby_album/posters/{_safe_stem_from_key(key, fallback=str(getattr(photo, "id", "")))}.jpg'
+                _upload_file_to_s3(s3, bucket, poster_key, tmp_poster, content_type='image/jpeg')
+                photo.poster.name = poster_key
                 photo.save(update_fields=['poster'])
-            _ensure_video_streams(photo, tmp_out, s3=s3, bucket=bucket)
+            _ensure_video_streams(photo, stream_input, s3=s3, bucket=bucket)
             return
 
         media_root = getattr(settings, 'MEDIA_ROOT', None)
@@ -502,10 +546,11 @@ def _process_album_photo_video(photo: AlbumPhoto, asset: MediaAsset | None = Non
         if not local_path.exists() or local_path.is_dir():
             return
         shutil.copyfile(str(local_path), tmp_in)
-        if not _optimize_faststart(tmp_in, tmp_out):
-            return
-        os.makedirs(str(local_path.parent), exist_ok=True)
-        shutil.move(tmp_out, str(local_path))
+
+        if _optimize_faststart(tmp_in, tmp_out):
+            os.makedirs(str(local_path.parent), exist_ok=True)
+            shutil.move(tmp_out, str(local_path))
+
         if _extract_poster(str(local_path), tmp_poster):
             with open(tmp_poster, 'rb') as f:
                 poster_name = f'{Path(key).stem}.jpg'
@@ -632,20 +677,20 @@ class AlbumVideoHlsView(APIView):
                     obj = s3.get_object(Bucket=bucket, Key=key)
                     text = obj['Body'].read().decode('utf-8', errors='ignore')
                 except Exception:
-                    return Response({'code': 404, 'msg': 'Not found', 'data': None}, status=404)
-                base_dir = Path(rel).parent.as_posix()
-                if base_dir == '.':
-                    base_dir = ''
-                lines = []
-                for line in (text or '').splitlines():
-                    t = line.strip()
-                    if not t or t.startswith('#') or t.startswith('http://') or t.startswith('https://'):
-                        lines.append(line)
-                        continue
-                    joined = f'{base_dir}/{t}' if base_dir else t
-                    abs_url = request.build_absolute_uri(f'/baby/albums/video/{stream_id}/hls/{joined}')
-                    lines.append(abs_url)
-                return _write_text_response('\n'.join(lines) + '\n', content_type='application/vnd.apple.mpegurl')
+                    src = (request.query_params.get('src') or '').strip()
+                    if src:
+                        _ensure_video_streams_for_src(stream_id=stream_id, src_key=src, s3=s3, bucket=bucket)
+                        try:
+                            obj = s3.get_object(Bucket=bucket, Key=key)
+                            text = obj['Body'].read().decode('utf-8', errors='ignore')
+                        except Exception:
+                            return Response({'code': 404, 'msg': 'Not found', 'data': None}, status=404)
+                    else:
+                        return Response({'code': 404, 'msg': 'Not found', 'data': None}, status=404)
+                out = (text or '')
+                if out and not out.endswith('\n'):
+                    out += '\n'
+                return _write_text_response(out, content_type='application/vnd.apple.mpegurl')
             url = s3.generate_presigned_url(
                 ClientMethod='get_object',
                 Params={'Bucket': bucket, 'Key': key},
@@ -664,19 +709,10 @@ class AlbumVideoHlsView(APIView):
                 text = local_path.read_text(encoding='utf-8', errors='ignore')
             except Exception:
                 return Response({'code': 404, 'msg': 'Not found', 'data': None}, status=404)
-            base_dir = Path(rel).parent.as_posix()
-            if base_dir == '.':
-                base_dir = ''
-            lines = []
-            for line in (text or '').splitlines():
-                t = line.strip()
-                if not t or t.startswith('#') or t.startswith('http://') or t.startswith('https://'):
-                    lines.append(line)
-                    continue
-                joined = f'{base_dir}/{t}' if base_dir else t
-                abs_url = request.build_absolute_uri(f'/baby/albums/video/{stream_id}/hls/{joined}')
-                lines.append(abs_url)
-            return _write_text_response('\n'.join(lines) + '\n', content_type='application/vnd.apple.mpegurl')
+            out = (text or '')
+            if out and not out.endswith('\n'):
+                out += '\n'
+            return _write_text_response(out, content_type='application/vnd.apple.mpegurl')
         return redirect(f'/media/{key}')
 
 
@@ -700,7 +736,16 @@ class AlbumVideoDashView(APIView):
                     obj = s3.get_object(Bucket=bucket, Key=key)
                     text = obj['Body'].read().decode('utf-8', errors='ignore')
                 except Exception:
-                    return Response({'code': 404, 'msg': 'Not found', 'data': None}, status=404)
+                    src = (request.query_params.get('src') or '').strip()
+                    if src:
+                        _ensure_video_streams_for_src(stream_id=stream_id, src_key=src, s3=s3, bucket=bucket)
+                        try:
+                            obj = s3.get_object(Bucket=bucket, Key=key)
+                            text = obj['Body'].read().decode('utf-8', errors='ignore')
+                        except Exception:
+                            return Response({'code': 404, 'msg': 'Not found', 'data': None}, status=404)
+                    else:
+                        return Response({'code': 404, 'msg': 'Not found', 'data': None}, status=404)
                 return _write_text_response(text, content_type='application/dash+xml')
             url = s3.generate_presigned_url(
                 ClientMethod='get_object',
@@ -786,7 +831,13 @@ class BabyAlbumListCreateView(APIView):
             media_asset_ids = data.get('media_asset_ids') if isinstance(data, dict) else None
             serializer = BabyAlbumSerializer(data=data, context={'request': request})
             if serializer.is_valid():
-                album = serializer.save()
+                try:
+                    album = serializer.save()
+                except DataError as e:
+                    msg = str(e)
+                    if 'incorrect string value' in msg.lower() or 'invalid utf8' in msg.lower():
+                        return Response({'code': 400, 'msg': '内容包含表情/特殊字符，当前数据库编码不支持，请将 MySQL 字符集改为 utf8mb4', 'data': None})
+                    raise
                 
                 # Handle images
                 # FormData should append images with same key 'images' or 'file'
@@ -794,6 +845,9 @@ class BabyAlbumListCreateView(APIView):
                 if not images:
                     # Try 'file' as well just in case
                     images = request.FILES.getlist('file')
+
+                if images and getattr(settings, 'USE_S3_MEDIA', False):
+                    return Response({'code': 400, 'msg': '请使用 MinIO 直传上传', 'data': None})
 
                 if images:
                     for image in images:

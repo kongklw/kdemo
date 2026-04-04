@@ -378,19 +378,28 @@ class AlbumPhotoSerializer(serializers.ModelSerializer):
         if not obj or getattr(obj, 'is_video', False):
             return ''
         base = f'baby_album/thumbs/{self._stream_id(obj)}_w400'
-        return f'/file/img?base={quote(base)}'
+        key = getattr(getattr(obj, 'image', None), 'name', None) or ''
+        if not key:
+            return f'/file/img?base={quote(base)}'
+        return f'/file/img?base={quote(base)}&src={quote(key)}'
 
     def get_hls(self, obj):
         if not obj or not getattr(obj, 'is_video', False):
             return ''
         sid = self._stream_id(obj)
-        return f'/baby/albums/video/{quote(sid)}/hls/master.m3u8'
+        key = getattr(getattr(obj, 'image', None), 'name', None) or ''
+        if not key:
+            return f'/baby/albums/video/{quote(sid)}/hls/master.m3u8'
+        return f'/baby/albums/video/{quote(sid)}/hls/master.m3u8?src={quote(key)}'
 
     def get_dash(self, obj):
         if not obj or not getattr(obj, 'is_video', False):
             return ''
         sid = self._stream_id(obj)
-        return f'/baby/albums/video/{quote(sid)}/dash/manifest.mpd'
+        key = getattr(getattr(obj, 'image', None), 'name', None) or ''
+        if not key:
+            return f'/baby/albums/video/{quote(sid)}/dash/manifest.mpd'
+        return f'/baby/albums/video/{quote(sid)}/dash/manifest.mpd?src={quote(key)}'
 
     def get_image(self, obj):
         if not obj or not getattr(obj, 'image', None):
@@ -401,12 +410,18 @@ class AlbumPhotoSerializer(serializers.ModelSerializer):
         return f'/file/r?key={quote(key)}'
 
     def get_poster(self, obj):
-        if not obj or not getattr(obj, 'poster', None):
+        if not obj or not getattr(obj, 'is_video', False):
             return ''
-        key = getattr(obj.poster, 'name', None) or ''
-        if not key:
+        if getattr(obj, 'poster', None):
+            key = getattr(obj.poster, 'name', None) or ''
+            if key:
+                return f'/file/r?key={quote(key)}'
+        src = getattr(getattr(obj, 'image', None), 'name', None) or ''
+        if not src:
             return ''
-        return f'/file/r?key={quote(key)}'
+        sid = self._stream_id(obj)
+        poster_key = f'baby_album/posters/{sid}.jpg'
+        return f'/file/r?key={quote(poster_key)}&src={quote(src)}'
 
 
 class BabyAlbumSerializer(serializers.ModelSerializer):

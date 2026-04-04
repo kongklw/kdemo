@@ -152,6 +152,9 @@ DATABASES = {
         'PASSWORD': env('MYSQL_PASSWORD'),
         'HOST': env('DB_HOST'),  # Or an IP Address that your DB is hosted on
         'PORT': env('DB_PORT'),
+        'OPTIONS': {
+            'charset': 'utf8mb4',
+        },
     }
 }
 
