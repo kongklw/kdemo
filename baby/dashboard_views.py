@@ -2,6 +2,7 @@ import json
 import logging
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from .models import BabyInfo, FeedMilk, SleepLog, BabyDiapers, BabyExpense, Temperature, TodoList, UserAppOrder
 from datetime import datetime, timedelta, date
 from django.db.models import Sum
@@ -12,6 +13,8 @@ logger = logging.getLogger(__name__)
 
 
 class DashBoardView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def post(self, request, *args, **kwargs):
         """Save the user's app order preference"""
         user = request.user

@@ -7,6 +7,8 @@ import asyncio
 from django.db import connection
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django.db.models.functions import TruncDate
 from custom import MyModelViewSet
 from .models import BabyInfo, FeedMilk, SleepLog, BabyDiapers, BabyExpense, Temperature, TodoList
 from .serializers import BabyInfoSerializer, FeedMilkSerializer, SleepLogSerializer, BabyDiapersSerializer, \
@@ -23,6 +25,8 @@ logger = logging.getLogger(__name__)
 
 
 class FeedMilkView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def get(self, request, *args, **kwargs):
         try:
             user = request.user
@@ -142,39 +146,39 @@ def process_feed_chart(user_id):
                         'yMin': 600},
         'basic_info': {'milkVolumes': 0, 'refermilkVolumes': '800-1000'}}
 
-    with connection.cursor() as cursor:
-        cursor.execute(
-            "select sum(milk_volume) as total_volume from kdemo.baby_feedmilk where user_id=%s and date(feed_time)=curdate();",
-            [user_id])
-        rows = dictfetchall(cursor)
+    today = date.today()
 
-        chartData['basic_info']['milkVolumes'] = rows[0]['total_volume']
+    total = FeedMilk.objects.filter(user_id=user_id, feed_time__date=today).aggregate(total=Sum('milk_volume')).get('total') or 0
+    chartData['basic_info']['milkVolumes'] = int(total) if total is not None else 0
 
-    current_objs = FeedMilk.objects.raw(
-        # f"SELECT id, CONCAT(HOUR(feed_time),':',LPAD(MINUTE(feed_time),2,'0')) as time, milk_volume FROM kdemo.baby_feedmilk where user_id={user_id} and date(feed_time)=date(NOW());")
-        f"SELECT id, CONCAT(HOUR(feed_time),':',LPAD(MINUTE(feed_time),2,'0')) as time, milk_volume FROM kdemo.baby_feedmilk where user_id={user_id} and date(feed_time)=CURDATE() ORDER BY feed_time ASC;")
-
-    for obj in current_objs:
-
+    current_qs = FeedMilk.objects.filter(user_id=user_id, feed_time__date=today).order_by('feed_time')
+    for obj in current_qs:
         chartData['current_day']['lowData'].append(120)
         chartData['current_day']['highData'].append(210)
-        chartData['current_day']['xAxisData'].append(obj.time)
+        chartData['current_day']['xAxisData'].append(obj.feed_time.strftime('%H:%M'))
         chartData['current_day']['actualData'].append(obj.milk_volume)
 
-    with connection.cursor() as cursor:
-        cursor.execute(
-            "SELECT sum(milk_volume) as day_volumes, date(feed_time) as date FROM kdemo.baby_feedmilk where user_id=%s and DATE_SUB(CURDATE(), INTERVAL 15 DAY) < date(feed_time) group by date(feed_time);",
-            [user_id])
-        rows = dictfetchall(cursor)
-        for row in rows:
-            chartData['latest_week']['lowData'].append(800)
-            chartData['latest_week']['highData'].append(1000)
-            chartData['latest_week']['xAxisData'].append(row['date'])
-            chartData['latest_week']['actualData'].append(row['day_volumes'])
+    start_date = today - timedelta(days=14)
+    latest = (
+        FeedMilk.objects.filter(user_id=user_id, feed_time__date__gte=start_date, feed_time__date__lte=today)
+        .annotate(day=TruncDate('feed_time'))
+        .values('day')
+        .annotate(day_volumes=Sum('milk_volume'))
+        .order_by('day')
+    )
+    for row in latest:
+        d = row.get('day')
+        v = row.get('day_volumes') or 0
+        chartData['latest_week']['lowData'].append(800)
+        chartData['latest_week']['highData'].append(1000)
+        chartData['latest_week']['xAxisData'].append(d.isoformat() if d else '')
+        chartData['latest_week']['actualData'].append(int(v) if v is not None else 0)
     return chartData
 
 
 class FeedChart(APIView):
+    permission_classes = [IsAuthenticated]
+
     def get(self, request, *args, **kwargs):
         '''
         feedChartData: {

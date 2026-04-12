@@ -72,6 +72,7 @@ INSTALLED_APPS = [
     'fileUpload',
     'django_celery_results',
     'storages',
+    'rag'
 ]
 
 
@@ -203,15 +204,30 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
+_SPECTACULAR_SERVERS = [{'url': '/', 'description': 'Local'}]
+if not DEBUG:
+    _SPECTACULAR_SERVERS.insert(0, {'url': '/prod-api', 'description': 'Nginx /prod-api 前缀'})
+
 SPECTACULAR_SETTINGS = {
     'TITLE': 'KDemo Project API',
     'DESCRIPTION': 'This is a project forYour project description',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
-    'SWAGGER_UI_DIST': 'SIDECAR',  # shorthand to use the sidecar instead
+    'SWAGGER_UI_DIST': 'SIDECAR',
     'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
     'REDOC_DIST': 'SIDECAR',
     # OTHER SETTINGS
+    'SERVERS': _SPECTACULAR_SERVERS,
+    'SECURITY': [{'bearerAuth': []}],
+    'APPEND_COMPONENTS': {
+        'securitySchemes': {
+            'bearerAuth': {
+                'type': 'http',
+                'scheme': 'bearer',
+                'bearerFormat': 'JWT',
+            }
+        }
+    },
 }
 
 SIMPLE_JWT = {

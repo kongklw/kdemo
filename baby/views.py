@@ -265,7 +265,18 @@ def _decorate_birthday(record: BirthdayRecord) -> dict:
     return data
 
 
+def get_temperature(user_id, date, mode):
+    if mode == 'week':
+        start_date = date - timedelta(days=7)
+        objs = Temperature.objects.filter(user=user_id, measure_date__gte=start_date, measure_date__lte=date).order_by('-measure_date')
+    else:
+        objs = Temperature.objects.filter(user=user_id, measure_date=date)
+    serializer = TemperatureSerializer(objs, many=True)
+    return serializer.data
+
+
 class LineChartView(APIView):
+    permission_classes = [IsAuthenticated]
 
     def process_chartData(self, data, type, need_total=False):
         total_count = 0
@@ -347,7 +358,7 @@ class LineChartView(APIView):
         try:
             t = Temperature.objects.get(user=user_id, measure_date=date)
             temperature = t.temperature
-        except ObjectDoesNotExist or MultipleObjectsReturned as exc:
+        except (ObjectDoesNotExist, MultipleObjectsReturned) as exc:
             logger.error(str(exc))
             temperature = '未测'
 

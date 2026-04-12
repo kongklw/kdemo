@@ -33,6 +33,9 @@ urlpatterns = [
                   # Optional UI:
                   path('api/schema/swagger-ui/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
                   path('api/schema/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+                  path('swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui-short'),
+                  path('redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc-short'),
+                  path('openapi/', SpectacularAPIView.as_view(), name='schema-short'),
 
                   path('admin/', admin.site.urls),
                   path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
@@ -46,5 +49,6 @@ urlpatterns = [
                   path("ai/", include("aistart.urls")),
 
                   path('file/', include("fileUpload.urls")),
+                  path('rag/', include("rag.urls")),
 
               ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
